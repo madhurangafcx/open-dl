@@ -154,6 +154,12 @@ b1 = [0.1, 0.1, 0.1, 0.1]
 Calculate the weighted sum for each of the four hidden neurons:
 
 ```text
+z = (input_1 × weight_1) + (input_2 × weight_2) + bias
+
+z: Represents the raw weighted sum (pre-activation) before any activation function like ReLU is applied.
+The first 1: Refers to Layer 1 (the hidden layer).
+The second 1: Refers to Neuron 1 (the first of the 4 hidden neurons).
+
 z1_1 = (0 × 0.5)  + (1 × 1.0)  + 0.1 =  1.1
 z1_2 = (0 × -0.5) + (1 × 0.5)  + 0.1 =  0.6
 z1_3 = (0 × 1.0)  + (1 × -1.0) + 0.1 = -0.9
@@ -192,6 +198,32 @@ z2_class_1 = (1.1 × 0.5) + (0.6 × 1.0) + (0.0 × -0.5) + (0.0 × 0.5) - 0.1
 
 Z2 = [-1.05, 1.05]
 ```
+
+What does exp(-1.05) actually mean?
+exp(x) means Euler's number e ≈ 2.71828 raised to the power of x:
+```text
+exp(-1.05) = e^(-1.05) = (2.71828)^(-1.05) ≈ 0.349937
+```
+
+A negative exponent means taking the reciprocal:
+```text
+e^(-1.05) = 1 / (e^1.05) = 1 / 2.85765 ≈ 0.349937
+```
+
+Why do we apply exp() to raw scores?
+Before softmax, the two output neurons produced raw logits:
+
+Class 0 logit: z0 = -1.05
+Class 1 logit: z1 = +1.05
+Raw logits cannot be used as probabilities directly for two major reasons:
+
+Probabilities cannot be negative: z0 is -1.05. A negative probability like -105% makes no mathematical sense. The exponential function e^x is always strictly positive for any number:
+
+e^(-10) = 0.000045 (tiny, but positive)
+e^(-1.05) = 0.3499 (positive)
+e^(0) = 1.0
+e^(1.05) = 2.8577 (positive) Applying exp() guarantees every score becomes a positive number.
+It magnifies differences (winner takes more): A score of +1.05 is higher than -1.05. Exponentiating turns -1.05 into 0.35 and +1.05 into 2.86 — making the difference between the two classes much more pronounced.
 
 Finally, apply softmax:
 
@@ -233,6 +265,83 @@ $$
 Z_1 = XW_1 + b_1
 $$
 
+This represents two distinct operations:
+1. **Matrix Multiplication ($X W_1$)**: Multiplying the $(4, 2)$ input matrix by the $(2, 4)$ weight matrix to compute pre-activations for all 4 examples across all 4 neurons simultaneously.
+2. **Broadcasting Addition ($+ b_1$)**: Adding the $(1, 4)$ bias vector to every row of the resulting matrix.
+
+#### Step-by-step matrix calculation:
+
+$$
+X = \begin{bmatrix}
+0 & 0 \\
+0 & 1 \\
+1 & 0 \\
+1 & 1
+\end{bmatrix}, \qquad
+W_1 = \begin{bmatrix}
+0.5 & -0.5 & 1.0 & -1.0 \\
+1.0 & 0.5 & -1.0 & -0.5
+\end{bmatrix}, \qquad
+b_1 = \begin{bmatrix} 0.1 & 0.1 & 0.1 & 0.1 \end{bmatrix}
+$$
+
+**Step A — Matrix Multiplication ($X W_1$):**
+
+Each cell $(i, j)$ is the dot product of Row $i$ of $X$ and Column $j$ of $W_1$:
+
+$$
+X W_1 = \begin{bmatrix}
+(0 \times 0.5 + 0 \times 1.0) & (0 \times -0.5 + 0 \times 0.5) & (0 \times 1.0 + 0 \times -1.0) & (0 \times -1.0 + 0 \times -0.5) \\
+(0 \times 0.5 + 1 \times 1.0) & (0 \times -0.5 + 1 \times 0.5) & (0 \times 1.0 + 1 \times -1.0) & (0 \times -1.0 + 1 \times -0.5) \\
+(1 \times 0.5 + 0 \times 1.0) & (1 \times -0.5 + 0 \times 0.5) & (1 \times 1.0 + 0 \times -1.0) & (1 \times -1.0 + 0 \times -0.5) \\
+(1 \times 0.5 + 1 \times 1.0) & (1 \times -0.5 + 1 \times 0.5) & (1 \times 1.0 + 1 \times -1.0) & (1 \times -1.0 + 1 \times -0.5)
+\end{bmatrix}
+$$
+
+Evaluating each cell:
+
+$$
+X W_1 = \begin{bmatrix}
+0.0 &  0.0 &  0.0 &  0.0 \\
+1.0 &  0.5 & -1.0 & -0.5 \\
+0.5 & -0.5 &  1.0 & -1.0 \\
+1.5 &  0.0 &  0.0 & -1.5
+\end{bmatrix}
+$$
+
+**Step B — Broadcasting Addition ($+ b_1$):**
+
+The bias vector $b_1 = [0.1, 0.1, 0.1, 0.1]$ has a single row. NumPy broadcasts that row down all 4 rows, adding each neuron's bias to its respective column:
+
+$$
+Z_1 = \begin{bmatrix}
+0.0 &  0.0 &  0.0 &  0.0 \\
+1.0 &  0.5 & -1.0 & -0.5 \\
+0.5 & -0.5 &  1.0 & -1.0 \\
+1.5 &  0.0 &  0.0 & -1.5
+\end{bmatrix}
++
+\begin{bmatrix}
+0.1 & 0.1 & 0.1 & 0.1 \\
+0.1 & 0.1 & 0.1 & 0.1 \\
+0.1 & 0.1 & 0.1 & 0.1 \\
+0.1 & 0.1 & 0.1 & 0.1
+\end{bmatrix}
+=
+\begin{bmatrix}
+0.1 &  0.1 &  0.1 &  0.1 \\
+1.1 &  0.6 & -0.9 & -0.4 \\
+0.6 & -0.4 &  1.1 & -0.9 \\
+1.6 &  0.1 &  0.1 & -1.4
+\end{bmatrix}
+$$
+
+#### Row-by-row meaning of $Z_1$:
+- **Row 0** ($[0, 0]$): Both inputs are 0, so all weight products vanish, leaving only the biases $[0.1, 0.1, 0.1, 0.1]$.
+- **Row 1** ($[0, 1]$): Exactly matches the single-example calculation $[1.1, 0.6, -0.9, -0.4]$.
+- **Row 2** ($[1, 0]$): Evaluates $[0.6, -0.4, 1.1, -0.9]$.
+- **Row 3** ($[1, 1]$): Combines both active features, evaluating $[1.6, 0.1, 0.1, -1.4]$.
+
 ```text
 X:  (4, 2)
 W1: (2, 4)
@@ -244,24 +353,88 @@ Z1.shape = (4, 4)
 
 ### 2. ReLU activation
 
+The Rectified Linear Unit (ReLU) activation function is defined element-by-element as:
+
 $$
 \operatorname{ReLU}(z) = \max(0, z)
 $$
+
+For the hidden layer activation matrix:
 
 $$
 A_1 = \operatorname{ReLU}(Z_1)
 $$
 
-```text
-ReLU(-3) = 0
-ReLU(0)  = 0
-ReLU(2)  = 2
+#### Mathematical solving steps on the matrix $Z_1$:
 
+We evaluate $\max(0, z)$ on each of the 16 elements of $Z_1$:
+
+$$
+Z_1 = \begin{bmatrix}
+0.1 &  0.1 &  0.1 &  0.1 \\
+1.1 &  0.6 & -0.9 & -0.4 \\
+0.6 & -0.4 &  1.1 & -0.9 \\
+1.6 &  0.1 &  0.1 & -1.4
+\end{bmatrix}
+$$
+
+Substitute every pre-activation into $\max(0, z)$:
+
+$$
+A_1 = \begin{bmatrix}
+\max(0, 0.1) & \max(0, 0.1) & \max(0, 0.1) & \max(0, 0.1) \\
+\max(0, 1.1) & \max(0, 0.6) & \max(0, -0.9) & \max(0, -0.4) \\
+\max(0, 0.6) & \max(0, -0.4) & \max(0, 1.1) & \max(0, -0.9) \\
+\max(0, 1.6) & \max(0, 0.1) & \max(0, 0.1) & \max(0, -1.4)
+\end{bmatrix}
+$$
+
+#### Element-by-element evaluation:
+- **Row 0** ($[0, 0]$):
+  - $\max(0, 0.1) = 0.1$ (neuron 1 fires)
+  - $\max(0, 0.1) = 0.1$ (neuron 2 fires)
+  - $\max(0, 0.1) = 0.1$ (neuron 3 fires)
+  - $\max(0, 0.1) = 0.1$ (neuron 4 fires)
+  - Result: $[0.1, 0.1, 0.1, 0.1]$
+- **Row 1** ($[0, 1]$):
+  - $\max(0, 1.1) = 1.1$ (neuron 1 fires)
+  - $\max(0, 0.6) = 0.6$ (neuron 2 fires)
+  - $\max(0, -0.9) = 0.0$ (neuron 3 is clamped to 0)
+  - $\max(0, -0.4) = 0.0$ (neuron 4 is clamped to 0)
+  - Result: $[1.1, 0.6, 0.0, 0.0]$
+- **Row 2** ($[1, 0]$):
+  - $\max(0, 0.6) = 0.6$
+  - $\max(0, -0.4) = 0.0$ (neuron 2 clamped to 0)
+  - $\max(0, 1.1) = 1.1$
+  - $\max(0, -0.9) = 0.0$ (neuron 4 clamped to 0)
+  - Result: $[0.6, 0.0, 1.1, 0.0]$
+- **Row 3** ($[1, 1]$):
+  - $\max(0, 1.6) = 1.6$
+  - $\max(0, 0.1) = 0.1$
+  - $\max(0, 0.1) = 0.1$
+  - $\max(0, -1.4) = 0.0$ (neuron 4 clamped to 0)
+  - Result: $[1.6, 0.1, 0.1, 0.0]$
+
+Yielding the activation matrix $A_1$:
+
+$$
+A_1 = \begin{bmatrix}
+0.1 & 0.1 & 0.1 & 0.1 \\
+1.1 & 0.6 & 0.0 & 0.0 \\
+0.6 & 0.0 & 1.1 & 0.0 \\
+1.6 & 0.1 & 0.1 & 0.0
+\end{bmatrix}
+$$
+
+```text
 A1.shape = (4, 4)
 ```
 
-ReLU introduces non-linearity. Without it, two dense layers would still act
-like one linear layer and could not solve XOR.
+#### Why ReLU is mathematically required:
+1. **Clamping negative values acts as a feature gate**: Only neurons that detect relevant patterns fire ($> 0$). Neurons with negative responses are silenced ($= 0$).
+2. **Breaks linearity**: Without ReLU, $A_1 = Z_1$. Then $Z_2 = (X W_1 + b_1) W_2 + b_2 = X (W_1 W_2) + (b_1 W_2 + b_2)$. Because $W_1 W_2$ is just another $(2, 2)$ matrix, two linear layers collapse into one linear layer, which mathematically cannot solve XOR.
+
+---
 
 ### 3. Output-layer weighted sum
 
@@ -270,6 +443,114 @@ The output layer calculates two raw class scores, called logits:
 $$
 Z_2 = A_1W_2 + b_2
 $$
+
+This represents two distinct operations:
+1. **Matrix Multiplication ($A_1 W_2$)**: Multiplying the $(4, 4)$ hidden activation matrix by the $(4, 2)$ output weight matrix to compute raw scores for all 4 examples across both classes simultaneously.
+2. **Broadcasting Addition ($+ b_2$)**: Adding the $(1, 2)$ output bias vector to every row of the resulting matrix.
+
+#### Step-by-step matrix calculation:
+
+$$
+A_1 = \begin{bmatrix}
+0.1 & 0.1 & 0.1 & 0.1 \\
+1.1 & 0.6 & 0.0 & 0.0 \\
+0.6 & 0.0 & 1.1 & 0.0 \\
+1.6 & 0.1 & 0.1 & 0.0
+\end{bmatrix}, \qquad
+W_2 = \begin{bmatrix}
+-0.5 &  0.5 \\
+-1.0 &  1.0 \\
+ 0.5 & -0.5 \\
+-0.5 &  0.5
+\end{bmatrix}, \qquad
+b_2 = \begin{bmatrix} 0.1 & -0.1 \end{bmatrix}
+$$
+
+**Step A — Matrix Multiplication ($A_1 W_2$):**
+
+Each cell $(i, c)$ is the dot product of Row $i$ of $A_1$ (hidden activations for Example $i$) and Column $c$ of $W_2$ (weights connecting to Class $c$):
+
+$$
+A_1 W_2 = \begin{bmatrix}
+(0.1 \times -0.5 + 0.1 \times -1.0 + 0.1 \times 0.5 + 0.1 \times -0.5) & (0.1 \times 0.5 + 0.1 \times 1.0 + 0.1 \times -0.5 + 0.1 \times 0.5) \\
+(1.1 \times -0.5 + 0.6 \times -1.0 + 0.0 \times 0.5 + 0.0 \times -0.5) & (1.1 \times 0.5 + 0.6 \times 1.0 + 0.0 \times -0.5 + 0.0 \times 0.5) \\
+(0.6 \times -0.5 + 0.0 \times -1.0 + 1.1 \times 0.5 + 0.0 \times -0.5) & (0.6 \times 0.5 + 0.0 \times 1.0 + 1.1 \times -0.5 + 0.0 \times 0.5) \\
+(1.6 \times -0.5 + 0.1 \times -1.0 + 0.1 \times 0.5 + 0.0 \times -0.5) & (1.6 \times 0.5 + 0.1 \times 1.0 + 0.1 \times -0.5 + 0.0 \times 0.5)
+\end{bmatrix}
+$$
+
+Evaluating each cell:
+
+$$
+A_1 W_2 = \begin{bmatrix}
+(-0.05 - 0.10 + 0.05 - 0.05) & (0.05 + 0.10 - 0.05 + 0.05) \\
+(-0.55 - 0.60 + 0.00 - 0.00) & (0.55 + 0.60 - 0.00 + 0.00) \\
+(-0.30 - 0.00 + 0.55 - 0.00) & (0.30 + 0.00 - 0.55 + 0.00) \\
+(-0.80 - 0.10 + 0.05 - 0.00) & (0.80 + 0.10 - 0.05 + 0.00)
+\end{bmatrix}
+=
+\begin{bmatrix}
+-0.15 &  0.15 \\
+-1.15 &  1.15 \\
+ 0.25 & -0.25 \\
+-0.85 &  0.85
+\end{bmatrix}
+$$
+
+**Step B — Broadcasting Addition ($+ b_2$):**
+
+The bias vector $b_2 = [0.1, -0.1]$ has a single row. NumPy broadcasts that row down all 4 rows, adding the Class 0 bias ($+0.1$) to column 0 and Class 1 bias ($-0.1$) to column 1:
+
+$$
+Z_2 = \begin{bmatrix}
+-0.15 &  0.15 \\
+-1.15 &  1.15 \\
+ 0.25 & -0.25 \\
+-0.85 &  0.85
+\end{bmatrix}
++
+\begin{bmatrix}
+0.1 & -0.1 \\
+0.1 & -0.1 \\
+0.1 & -0.1 \\
+0.1 & -0.1
+\end{bmatrix}
+=
+\begin{bmatrix}
+(-0.15 + 0.1) & (0.15 - 0.1) \\
+(-1.15 + 0.1) & (1.15 - 0.1) \\
+(0.25 + 0.1)  & (-0.25 - 0.1) \\
+(-0.85 + 0.1) & (0.85 - 0.1)
+\end{bmatrix}
+=
+\begin{bmatrix}
+-0.05 &  0.05 \\
+-1.05 &  1.05 \\
+ 0.35 & -0.35 \\
+-0.75 &  0.75
+\end{bmatrix}
+$$
+
+#### Detailed row-by-row equations:
+- **Row 0 ($[0, 0]$)**:
+  - $z_{2, \text{class } 0} = (0.1 \times -0.5) + (0.1 \times -1.0) + (0.1 \times 0.5) + (0.1 \times -0.5) + 0.1 = -0.15 + 0.1 = -0.05$
+  - $z_{2, \text{class } 1} = (0.1 \times 0.5) + (0.1 \times 1.0) + (0.1 \times -0.5) + (0.1 \times 0.5) - 0.1 = 0.15 - 0.1 = 0.05$
+  - Logits: $[-0.05, 0.05]$ (nearly equal, model is undecided).
+
+- **Row 1 ($[0, 1]$)**:
+  - $z_{2, \text{class } 0} = (1.1 \times -0.5) + (0.6 \times -1.0) + (0.0 \times 0.5) + (0.0 \times -0.5) + 0.1 = -1.15 + 0.1 = -1.05$
+  - $z_{2, \text{class } 1} = (1.1 \times 0.5) + (0.6 \times 1.0) + (0.0 \times -0.5) + (0.0 \times 0.5) - 0.1 = 1.15 - 0.1 = 1.05$
+  - Logits: $[-1.05, 1.05]$ (class 1 is higher, exactly matches single example).
+
+- **Row 2 ($[1, 0]$)**:
+  - $z_{2, \text{class } 0} = (0.6 \times -0.5) + (0.0 \times -1.0) + (1.1 \times 0.5) + (0.0 \times -0.5) + 0.1 = 0.25 + 0.1 = 0.35$
+  - $z_{2, \text{class } 1} = (0.6 \times 0.5) + (0.0 \times 1.0) + (1.1 \times -0.5) + (0.0 \times 0.5) - 0.1 = -0.25 - 0.1 = -0.35$
+  - Logits: $[0.35, -0.35]$ (class 0 is higher, wrong before training).
+
+- **Row 3 ($[1, 1]$)**:
+  - $z_{2, \text{class } 0} = (1.6 \times -0.5) + (0.1 \times -1.0) + (0.1 \times 0.5) + (0.0 \times -0.5) + 0.1 = -0.85 + 0.1 = -0.75$
+  - $z_{2, \text{class } 1} = (1.6 \times 0.5) + (0.1 \times 1.0) + (0.1 \times -0.5) + (0.0 \times 0.5) - 0.1 = 0.85 - 0.1 = 0.75$
+  - Logits: $[-0.75, 0.75]$ (class 1 is higher, wrong before training).
 
 ```text
 A1: (4, 4)
@@ -280,13 +561,7 @@ b2: (1, 2)
 Z2.shape = (4, 2)
 ```
 
-Example logits for one input:
-
-```text
-Z2 = [1.2, 3.5]
-```
-
-These are scores, not probabilities.
+These are raw scores (logits), not probabilities. Softmax converts them to probabilities next.
 
 ### 4. Softmax activation
 
@@ -320,6 +595,97 @@ $$
 
 Subtracting the same maximum from every logit does not change probabilities,
 but prevents very large exponential values.
+
+#### Mathematical solving steps on the matrix $Z_2$:
+
+We start with the $(4, 2)$ logits matrix computed by the output layer:
+
+$$
+Z_2 = \begin{bmatrix}
+-0.05 &  0.05 \\
+-1.05 &  1.05 \\
+ 0.35 & -0.35 \\
+-0.75 &  0.75
+\end{bmatrix}
+$$
+
+For each row $i$, the softmax operation follows three arithmetic steps:
+1. **Exponentiate each logit**: Calculate $e^{z_{i,0}}$ and $e^{z_{i,1}}$.
+2. **Compute row sum (normalizer)**: $S_i = e^{z_{i,0}} + e^{z_{i,1}}$.
+3. **Normalize by row sum**: $P_{i,0} = \frac{e^{z_{i,0}}}{S_i}$ and $P_{i,1} = \frac{e^{z_{i,1}}}{S_i}$.
+
+#### Detailed row-by-row solving steps:
+
+- **Row 0 ($[0, 0]$, Logits $[-0.05, 0.05]$)**:
+  - Exponentiate logits:
+    $$
+    e^{-0.05} \approx 0.951229, \qquad e^{0.05} \approx 1.051271
+    $$
+  - Row normalizer:
+    $$
+    S_0 = 0.951229 + 1.051271 = 2.002501
+    $$
+  - Probabilities:
+    $$
+    P_{0,0} = \frac{0.951229}{2.002501} \approx 0.475021, \qquad P_{0,1} = \frac{1.051271}{2.002501} \approx 0.524979
+    $$
+  - Verification: $0.475021 + 0.524979 = 1.000000$ (model is nearly undecided, $P \approx 50\%/50\%$).
+
+- **Row 1 ($[0, 1]$, Logits $[-1.05, 1.05]$)**:
+  - Exponentiate logits:
+    $$
+    e^{-1.05} \approx 0.349938, \qquad e^{1.05} \approx 2.857651
+    $$
+  - Row normalizer:
+    $$
+    S_1 = 0.349938 + 2.857651 = 3.207589
+    $$
+  - Probabilities:
+    $$
+    P_{1,0} = \frac{0.349938}{3.207589} \approx 0.109097, \qquad P_{1,1} = \frac{2.857651}{3.207589} \approx 0.890903
+    $$
+  - Verification: $0.109097 + 0.890903 = 1.000000$ (strongly predicts Class 1 with $89.1\%$).
+
+- **Row 2 ($[1, 0]$, Logits $[0.35, -0.35]$)**:
+  - Exponentiate logits:
+    $$
+    e^{0.35} \approx 1.419068, \qquad e^{-0.35} \approx 0.704688
+    $$
+  - Row normalizer:
+    $$
+    S_2 = 1.419068 + 0.704688 = 2.123756
+    $$
+  - Probabilities:
+    $$
+    P_{2,0} = \frac{1.419068}{2.123756} \approx 0.668188, \qquad P_{2,1} = \frac{0.704688}{2.123756} \approx 0.331812
+    $$
+  - Verification: $0.668188 + 0.331812 = 1.000000$ (predicts Class 0 with $66.8\%$, incorrect for XOR before training).
+
+- **Row 3 ($[1, 1]$, Logits $[-0.75, 0.75]$)**:
+  - Exponentiate logits:
+    $$
+    e^{-0.75} \approx 0.472367, \qquad e^{0.75} \approx 2.117000
+    $$
+  - Row normalizer:
+    $$
+    S_3 = 0.472367 + 2.117000 = 2.589367
+    $$
+  - Probabilities:
+    $$
+    P_{3,0} = \frac{0.472367}{2.589367} \approx 0.182426, \qquad P_{3,1} = \frac{2.117000}{2.589367} \approx 0.817574
+    $$
+  - Verification: $0.182426 + 0.817574 = 1.000000$ (predicts Class 1 with $81.8\%$, incorrect for XOR before training).
+
+#### Resulting Probability Matrix $P$ (shape $(4, 2)$):
+
+$$
+P = \begin{bmatrix}
+0.475021 & 0.524979 \\
+0.109097 & 0.890903 \\
+0.668188 & 0.331812 \\
+0.182426 & 0.817574
+\end{bmatrix}
+$$
 
 ### Complete batch forward pass calculation
 
