@@ -356,13 +356,13 @@ Z1.shape = (4, 4)
 The Rectified Linear Unit (ReLU) activation function is defined element-by-element as:
 
 $$
-\operatorname{ReLU}(z) = \max(0, z)
+\text{ReLU}(z) = \max(0, z)
 $$
 
 For the hidden layer activation matrix:
 
 $$
-A_1 = \operatorname{ReLU}(Z_1)
+A_1 = \text{ReLU}(Z_1)
 $$
 
 #### Mathematical solving steps on the matrix $Z_1$:
@@ -566,11 +566,11 @@ These are raw scores (logits), not probabilities. Softmax converts them to proba
 ### 4. Softmax activation
 
 $$
-\operatorname{softmax}(z_i) = \frac{e^{z_i}}{\sum_j e^{z_j}}
+\text{softmax}(z_i) = \frac{e^{z_i}}{\sum_j e^{z_j}}
 $$
 
 $$
-P = \operatorname{softmax}(Z_2)
+P = \text{softmax}(Z_2)
 $$
 
 For two classes:
@@ -589,7 +589,7 @@ P.shape = (4, 2)
 The NumPy implementation will use stable softmax:
 
 $$
-\operatorname{softmax}(z_i) =
+\text{softmax}(z_i) =
 \frac{e^{z_i - \max(z)}}{\sum_j e^{z_j - \max(z)}}
 $$
 
@@ -712,7 +712,7 @@ Z_1 = \begin{bmatrix} 0 & 0 \\ 0 & 1 \\ 1 & 0 \\ 1 & 1 \end{bmatrix}
 \end{bmatrix}
 $$
 
-#### 3. Hidden activation $A_1 = \operatorname{ReLU}(Z_1)$
+#### 3. Hidden activation $A_1 = \text{ReLU}(Z_1)$
 
 Clamp negative values to 0:
 
@@ -749,7 +749,7 @@ Z_2 = \begin{bmatrix}
 \end{bmatrix}
 $$
 
-#### 5. Output probabilities $P = \operatorname{softmax}(Z_2)$
+#### 5. Output probabilities $P = \text{softmax}(Z_2)$
 
 Normalize each row independently:
 
@@ -909,7 +909,7 @@ If a model predicts $P_{i, \text{true}} \to 0$, then $\log(0) \to -\infty$, prod
 To prevent this, `cross_entropy(Y, P)` in `src/ann.py` clamps probabilities using an $\epsilon = 10^{-15}$ threshold:
 
 $$
-P_{\text{clipped}} = \operatorname{clip}(P, 10^{-15}, 1 - 10^{-15})
+P_{\text{clipped}} = \text{clip}(P, 10^{-15}, 1 - 10^{-15})
 $$
 
 ---
@@ -1047,10 +1047,10 @@ $$
 
 #### Step B: Passing through ReLU activation derivative to get $dZ_1$
 
-Recall that $a_{1, j} = \operatorname{ReLU}(z_{1, j}) = \max(0, z_{1, j})$. The derivative of ReLU is:
+Recall that $a_{1, j} = \text{ReLU}(z_{1, j}) = \max(0, z_{1, j})$. The derivative of ReLU is:
 
 $$
-\frac{\partial a_{1, j}}{\partial z_{1, j}} = \operatorname{ReLU}'(z_{1, j}) = \begin{cases} 1 & \text{if } z_{1, j} > 0 \\ 0 & \text{if } z_{1, j} \leq 0 \end{cases}
+\frac{\partial a_{1, j}}{\partial z_{1, j}} = \text{ReLU}'(z_{1, j}) = \begin{cases} 1 & \text{if } z_{1, j} > 0 \\ 0 & \text{if } z_{1, j} \leq 0 \end{cases}
 $$
 
 Applying the chain rule:
@@ -1485,7 +1485,7 @@ Forward Pass -> Loss Evaluation -> Backpropagation -> Parameter Update
 
 If all weights are initialized to 0 ($W_1 = \mathbf{0}$, $W_2 = \mathbf{0}$, $b_1 = \mathbf{0}$, $b_2 = \mathbf{0}$):
 - For any input $x$, hidden pre-activation is zero: $z_{1, j} = 0$.
-- Every hidden neuron outputs the identical activation: $a_{1, 1} = a_{1, 2} = a_{1, 3} = a_{1, 4} = \operatorname{ReLU}(0) = 0$.
+- Every hidden neuron outputs the identical activation: $a_{1, 1} = a_{1, 2} = a_{1, 3} = a_{1, 4} = \text{ReLU}(0) = 0$.
 - In backpropagation, every hidden neuron receives the identical error gradient:
   $$
   dW_{1, 1} = dW_{1, 2} = dW_{1, 3} = dW_{1, 4}
@@ -1498,13 +1498,13 @@ If all weights are initialized to 0 ($W_1 = \mathbf{0}$, $W_2 = \mathbf{0}$, $b_
 Because ReLU sets all negative values to zero ($\max(0, z)$), it deactivates approximately half of the neurons, cutting the variance of activations in half:
 
 $$
-\operatorname{Var}(a) = \frac{1}{2}\operatorname{Var}(z)
+\text{Var}(a) = \frac{1}{2}\text{Var}(z)
 $$
 
 To prevent activations from vanishing toward zero as signals propagate deeper, He initialization compensates by doubling the variance:
 
 $$
-\operatorname{Var}(W_1) = \frac{2}{n_{\text{in}}}
+\text{Var}(W_1) = \frac{2}{n_{\text{in}}}
 $$
 
 Taking the square root gives the required standard deviation $\sigma$:
@@ -1541,7 +1541,7 @@ $$
 For linear and softmax layers, signals do not experience the half-plane cut of ReLU. Xavier initialization maintains constant activation and gradient variances by scaling by the harmonic mean of fan-in and fan-out:
 
 $$
-\operatorname{Var}(W_2) = \frac{2}{n_{\text{in}} + n_{\text{out}}} = \frac{2}{n_{\text{hidden}} + n_{\text{out}}}
+\text{Var}(W_2) = \frac{2}{n_{\text{in}} + n_{\text{out}}} = \frac{2}{n_{\text{hidden}} + n_{\text{out}}}
 $$
 
 Taking the square root:
@@ -1591,13 +1591,13 @@ $$
 
 ## Q10 — Prediction and evaluation metrics
 
-### 1. Decision rule: $\hat{y} = \operatorname{argmax}(P)$
+### 1. Decision rule: $\hat{y} = \text{argmax}(P)$
 
 Softmax produces a probability distribution $P \in \mathbb{R}^{m \times 2}$ where $P_{i, 0} + P_{i, 1} = 1.0$.
 The predicted class label $\hat{y}_i \in \{0, 1\}$ is the index of the class with higher probability:
 
 $$
-\hat{y}_i = \operatorname{argmax}_{c \in \{0, 1\}}(P_{i, c}) = \begin{cases} 0 & \text{if } P_{i, 0} > P_{i, 1} \\ 1 & \text{if } P_{i, 1} \geq P_{i, 0} \end{cases}
+\hat{y}_i = \text{argmax}_{c \in \{0, 1\}}(P_{i, c}) = \begin{cases} 0 & \text{if } P_{i, 0} > P_{i, 1} \\ 1 & \text{if } P_{i, 1} \geq P_{i, 0} \end{cases}
 $$
 
 ### 2. Accuracy metric calculation
@@ -1605,12 +1605,12 @@ $$
 Accuracy measures the proportion of samples classified correctly:
 
 $$
-\text{Accuracy} = \frac{1}{m}\sum_{i=1}^{m} \mathbb{I}(\hat{y}_i == y_i)
+\text{Accuracy} = \frac{1}{m}\sum_{i=1}^{m} \mathbf{1}(\hat{y}_i == y_i)
 $$
 
-Where $\mathbb{I}(\cdot)$ is the indicator function:
-- $\mathbb{I}(\text{true}) = 1$ (correct prediction)
-- $\mathbb{I}(\text{false}) = 0$ (incorrect prediction)
+Where $\mathbf{1}(\cdot)$ is the indicator function:
+- $\mathbf{1}(\text{true}) = 1$ (correct prediction)
+- $\mathbf{1}(\text{false}) = 0$ (incorrect prediction)
 
 ### 3. Concrete numerical calculation: Before Training vs After Training
 
@@ -1633,10 +1633,10 @@ $$
 
 Ground-truth labels: $y = [0, 1, 1, 0]$
 
-- **Example 0 ($[0, 0]$)**: $P = [0.475, 0.525] \implies \operatorname{argmax} \to \hat{y}_0 = 1$. Ground truth: $y_0 = 0$. Match: $\mathbb{I}(1 == 0) = 0$ (Incorrect).
-- **Example 1 ($[0, 1]$)**: $P = [0.109, 0.891] \implies \operatorname{argmax} \to \hat{y}_1 = 1$. Ground truth: $y_1 = 1$. Match: $\mathbb{I}(1 == 1) = 1$ (Correct).
-- **Example 2 ($[1, 0]$)**: $P = [0.668, 0.332] \implies \operatorname{argmax} \to \hat{y}_2 = 0$. Ground truth: $y_2 = 1$. Match: $\mathbb{I}(0 == 1) = 0$ (Incorrect).
-- **Example 3 ($[1, 1]$)**: $P = [0.182, 0.818] \implies \operatorname{argmax} \to \hat{y}_3 = 1$. Ground truth: $y_3 = 0$. Match: $\mathbb{I}(1 == 0) = 0$ (Incorrect).
+- **Example 0 ($[0, 0]$)**: $P = [0.475, 0.525] \implies \text{argmax} \to \hat{y}_0 = 1$. Ground truth: $y_0 = 0$. Match: 0 (Incorrect).
+- **Example 1 ($[0, 1]$)**: $P = [0.109, 0.891] \implies \text{argmax} \to \hat{y}_1 = 1$. Ground truth: $y_1 = 1$. Match: 1 (Correct).
+- **Example 2 ($[1, 0]$)**: $P = [0.668, 0.332] \implies \text{argmax} \to \hat{y}_2 = 0$. Ground truth: $y_2 = 1$. Match: 0 (Incorrect).
+- **Example 3 ($[1, 1]$)**: $P = [0.182, 0.818] \implies \text{argmax} \to \hat{y}_3 = 1$. Ground truth: $y_3 = 0$. Match: 0 (Incorrect).
 
 Predictions: $\hat{y} = [1, 1, 0, 1]$
 
@@ -1661,11 +1661,11 @@ P = \begin{bmatrix}
 \end{bmatrix}
 $$
 
-Evaluating $\operatorname{argmax}$:
-- **Example 0 ($[0, 0]$)**: $P = [0.9987, 0.0013] \implies \hat{y}_0 = 0$. Ground truth: $0$. Match: $\mathbb{I}(0 == 0) = 1$ (Correct, 99.87% confidence).
-- **Example 1 ($[0, 1]$)**: $P = [0.0003, 0.9997] \implies \hat{y}_1 = 1$. Ground truth: $1$. Match: $\mathbb{I}(1 == 1) = 1$ (Correct, 99.97% confidence).
-- **Example 2 ($[1, 0]$)**: $P = [0.0002, 0.9998] \implies \hat{y}_2 = 1$. Ground truth: $1$. Match: $\mathbb{I}(1 == 1) = 1$ (Correct, 99.98% confidence).
-- **Example 3 ($[1, 1]$)**: $P = [0.9998, 0.0002] \implies \hat{y}_3 = 0$. Ground truth: $0$. Match: $\mathbb{I}(0 == 0) = 1$ (Correct, 99.98% confidence).
+Evaluating $\text{argmax}$:
+- **Example 0 ($[0, 0]$)**: $P = [0.9987, 0.0013] \implies \hat{y}_0 = 0$. Ground truth: $0$. Match: 1 (Correct, 99.87% confidence).
+- **Example 1 ($[0, 1]$)**: $P = [0.0003, 0.9997] \implies \hat{y}_1 = 1$. Ground truth: $1$. Match: 1 (Correct, 99.97% confidence).
+- **Example 2 ($[1, 0]$)**: $P = [0.0002, 0.9998] \implies \hat{y}_2 = 1$. Ground truth: $1$. Match: 1 (Correct, 99.98% confidence).
+- **Example 3 ($[1, 1]$)**: $P = [0.9998, 0.0002] \implies \hat{y}_3 = 0$. Ground truth: $0$. Match: 1 (Correct, 99.98% confidence).
 
 Predictions: $\hat{y} = [0, 1, 1, 0]$
 
