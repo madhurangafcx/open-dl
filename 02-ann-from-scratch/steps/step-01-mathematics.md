@@ -768,34 +768,148 @@ Each row sums to $1.000000$.
 
 ## Q6 — Softmax cross-entropy loss
 
-Cross-entropy measures the difference between predicted probabilities $P$ and
-the correct one-hot targets $Y$.
+Cross-entropy measures the divergence between the predicted probability distribution $P$ and the ground-truth one-hot distribution $Y$.
 
-For one example:
-
-$$
-L_i = -\sum_{c=1}^{2} Y_{i,c} \log(P_{i,c}) = -\log(P_{i, \text{true\_class}})
-$$
-
-For a batch of $m$ examples ($m = 4$):
+For a single example $i$, cross-entropy over $C = 2$ classes is:
 
 $$
-L = -\frac{1}{m}\sum_{i=1}^{m}\sum_{c=1}^{2} Y_{i,c}\log(P_{i,c})
+L_i = -\sum_{c=1}^{2} Y_{i,c} \log(P_{i,c})
 $$
 
-### Example-by-example loss breakdown
+Where:
+- $\log$ is the natural logarithm ($\ln$, base $e$).
+- $Y_{i}$ is a one-hot target vector ($[1, 0]$ for Class 0, or $[0, 1]$ for Class 1).
+- Because exactly one target class has $Y_{i,c} = 1$ and the other has $Y_{i,c} = 0$, the sum collapses directly to:
 
-| Example | Input $x$ | Target $y$ | Predicted Probabilities $P$ | Target Prob $P_{\text{true}}$ | Individual Loss $L_i = -\log(P_{\text{true}})$ | Note |
+$$
+L_i = -\log(P_{i, \text{true\_class}})
+$$
+
+For a batch of $m$ examples ($m = 4$), the total loss is the arithmetic mean across all examples:
+
+$$
+L = -\frac{1}{m}\sum_{i=1}^{m}\sum_{c=1}^{2} Y_{i,c}\log(P_{i,c}) = \frac{1}{m}\sum_{i=1}^{m} L_i
+$$
+
+### Step-by-step matrix calculation
+
+We start with the one-hot target matrix $Y$ and predicted probability matrix $P$:
+
+$$
+Y = \begin{bmatrix}
+1 & 0 \\
+0 & 1 \\
+0 & 1 \\
+1 & 0
+\end{bmatrix}, \qquad
+P = \begin{bmatrix}
+0.475021 & 0.524979 \\
+0.109097 & 0.890903 \\
+0.668188 & 0.331812 \\
+0.182426 & 0.817574
+\end{bmatrix}
+$$
+
+#### Step A — Element-wise natural logarithm ($\log(P)$):
+
+$$
+\log(P) = \begin{bmatrix}
+\log(0.475021) & \log(0.524979) \\
+\log(0.109097) & \log(0.890903) \\
+\log(0.668188) & \log(0.331812) \\
+\log(0.182426) & \log(0.817574)
+\end{bmatrix}
+=
+\begin{bmatrix}
+-0.744396 & -0.644397 \\
+-2.215518 & -0.115520 \\
+-0.403186 & -1.103187 \\
+-1.701411 & -0.201414
+\end{bmatrix}
+$$
+
+#### Step B — One-hot masking ($Y \odot \log(P)$):
+
+Multiplying element-by-element with the one-hot target matrix zeroes out all false classes, keeping only the log-probability of the true label:
+
+$$
+Y \odot \log(P) = \begin{bmatrix}
+1 \times -0.744396 & 0 \times -0.644397 \\
+0 \times -2.215518 & 1 \times -0.115520 \\
+0 \times -0.403186 & 1 \times -1.103187 \\
+1 \times -1.701411 & 0 \times -0.201414
+\end{bmatrix}
+=
+\begin{bmatrix}
+-0.744396 &  0.000000 \\
+ 0.000000 & -0.115520 \\
+ 0.000000 & -1.103187 \\
+-1.701411 &  0.000000
+\end{bmatrix}
+$$
+
+#### Step C — Individual example loss $L_i = -\sum_{c} (Y \odot \log(P))_{i, c}$:
+
+- **Example 0 ($[0, 0]$, True Class 0)**:
+  $$
+  L_0 = -(1 \times \log(0.475021) + 0 \times \log(0.524979)) = -(-0.744396) = 0.744396
+  $$
+  *Intuition*: The model assigns roughly equal probabilities ($47.5\%$ vs $52.5\%$). The loss is moderate ($\approx 0.744$), reflecting maximum uncertainty ($\ln(2) \approx 0.693$).
+
+- **Example 1 ($[0, 1]$, True Class 1)**:
+  $$
+  L_1 = -(0 \times \log(0.109097) + 1 \times \log(0.890903)) = -(-0.115520) = 0.115520
+  $$
+  *Intuition*: The model predicts Class 1 with high confidence ($89.1\%$). The loss is very low ($0.116$), indicating an accurate prediction.
+
+- **Example 2 ($[1, 0]$, True Class 1)**:
+  $$
+  L_2 = -(0 \times \log(0.668188) + 1 \times \log(0.331812)) = -(-1.103187) = 1.103187
+  $$
+  *Intuition*: The model predicts Class 0 ($66.8\%$) instead of Class 1 ($33.2\%$). The loss exceeds $1.0$ ($1.103$), penalizing the wrong decision.
+
+- **Example 3 ($[1, 1]$, True Class 0)**:
+  $$
+  L_3 = -(1 \times \log(0.182426) + 0 \times \log(0.817574)) = -(-1.701411) = 1.701411
+  $$
+  *Intuition*: The model is confidently wrong, assigning $81.8\%$ to Class 1 and only $18.2\%$ to the true Class 0. The loss is heavily penalized at $1.701$.
+
+### Summary Table of Individual Losses
+
+| Example | Input $x$ | Target $y$ | Predicted Probabilities $P$ | Target Prob $P_{\text{true}}$ | Individual Loss $L_i = -\log(P_{\text{true}})$ | Prediction State |
 |:---|:---|:---|:---|:---|:---|:---|
 | **0** | $[0, 0]$ | Class 0 ($[1, 0]$) | $[0.475021, 0.524979]$ | $0.475021$ | $-\log(0.475021) \approx 0.744396$ | Undecided |
 | **1** | $[0, 1]$ | Class 1 ($[0, 1]$) | $[0.109097, 0.890903]$ | $0.890903$ | $-\log(0.890903) \approx 0.115520$ | Accurate prediction |
-| **2** | $[1, 0]$ | Class 1 ($[0, 1]$) | $[0.668188, 0.331812]$ | $0.331812$ | $-\log(0.331812) \approx 1.103187$ | Predicts class 0 (wrong) |
+| **2** | $[1, 0]$ | Class 1 ($[0, 1]$) | $[0.668188, 0.331812]$ | $0.331812$ | $-\log(0.331812) \approx 1.103187$ | Predicts wrong class |
 | **3** | $[1, 1]$ | Class 0 ($[1, 0]$) | $[0.182426, 0.817574]$ | $0.182426$ | $-\log(0.182426) \approx 1.701411$ | Confidently wrong |
 
-### Batch mean loss
+### Batch Mean Loss Calculation
+
+We average the 4 individual losses:
 
 $$
-L = \frac{0.744396 + 0.115520 + 1.103187 + 1.701411}{4} = 0.91612888
+L = \frac{1}{m} \sum_{i=1}^{4} L_i = \frac{0.744396 + 0.115520 + 1.103187 + 1.701411}{4}
+$$
+
+Sum of losses:
+
+$$
+\sum_{i=1}^{4} L_i = 3.664514
+$$
+
+Batch mean loss:
+
+$$
+L = \frac{3.664514}{4} = 0.91612888
+$$
+
+#### Numerical Stability in Implementation
+
+If a model predicts $P_{i, \text{true}} \to 0$, then $\log(0) \to -\infty$, producing a numerical `NaN` or `inf` error.
+To prevent this, `cross_entropy(Y, P)` in `src/ann.py` clamps probabilities using an $\epsilon = 10^{-15}$ threshold:
+
+$$
+P_{\text{clipped}} = \operatorname{clip}(P, 10^{-15}, 1 - 10^{-15})
 $$
 
 ---
@@ -900,28 +1014,61 @@ $$
 
 ### 3. Propagating gradients to the hidden layer: $dA_1$ and $dZ_1$
 
-Using the chain rule to find how loss changes with hidden activations:
+#### Step A: Derivation of activation gradient $dA_1$
+
+Hidden neuron $j$'s activation $a_{1, j}$ contributes to both output logits $z_{2, 0}$ and $z_{2, 1}$ through weights $W_{2, j, 0}$ and $W_{2, j, 1}$:
+
+$$
+z_{2, c} = \sum_{k=1}^{4} a_{1, k} W_{2, k, c} + b_{2, c}
+$$
+
+Taking the partial derivative of output logit $z_{2, c}$ with respect to hidden activation $a_{1, j}$:
+
+$$
+\frac{\partial z_{2, c}}{\partial a_{1, j}} = W_{2, j, c}
+$$
+
+By the multivariate chain rule, the gradient of the loss with respect to hidden activation $a_{1, j}$ is the sum of contributions from both output classes:
+
+$$
+\frac{\partial L}{\partial a_{1, j}} = \sum_{c=0}^{1} \frac{\partial L}{\partial z_{2, c}} \frac{\partial z_{2, c}}{\partial a_{1, j}} = dz_{2, 0} W_{2, j, 0} + dz_{2, 1} W_{2, j, 1}
+$$
+
+In matrix form across all $m = 4$ examples and all 4 hidden neurons:
 
 $$
 dA_1 = dZ_2 W_2^T
 $$
 
 **Dimension check:**
-- $dZ_2$: $(4, 2)$
-- $W_2^T$: $(2, 4)$
-- $(4, 2) @ (2, 4) \to (4, 4)$ (matches $A_1$ shape)
+- $dZ_2$ has shape $(4, 2)$
+- $W_2^T$ has shape $(2, 4)$
+- $(4, 2) @ (2, 4) \to (4, 4)$ (matches $A_1$ shape $(4, 4)$)
 
-Now pass through the ReLU activation derivative:
+#### Step B: Passing through ReLU activation derivative to get $dZ_1$
+
+Recall that $a_{1, j} = \operatorname{ReLU}(z_{1, j}) = \max(0, z_{1, j})$. The derivative of ReLU is:
 
 $$
-\operatorname{ReLU}'(z) = \begin{cases} 1 & \text{if } z > 0 \\ 0 & \text{if } z \leq 0 \end{cases}
+\frac{\partial a_{1, j}}{\partial z_{1, j}} = \operatorname{ReLU}'(z_{1, j}) = \begin{cases} 1 & \text{if } z_{1, j} > 0 \\ 0 & \text{if } z_{1, j} \leq 0 \end{cases}
 $$
 
-Element-wise multiplication with the mask $(Z_1 > 0)$:
+Applying the chain rule:
+
+$$
+\frac{\partial L}{\partial z_{1, j}} = \frac{\partial L}{\partial a_{1, j}} \cdot \frac{\partial a_{1, j}}{\partial z_{1, j}} = \begin{cases} da_{1, j} & \text{if } z_{1, j} > 0 \\ 0 & \text{if } z_{1, j} \leq 0 \end{cases}
+$$
+
+In matrix form across all examples and neurons, this is an element-wise product ($\odot$) with the boolean mask $(Z_1 > 0)$:
 
 $$
 dZ_1 = dA_1 \odot (Z_1 > 0)
 $$
+
+**Dimension check:**
+- $dA_1$ has shape $(4, 4)$
+- $(Z_1 > 0)$ has shape $(4, 4)$
+- $(4, 4) \odot (4, 4) \to (4, 4)$ (matches $Z_1$ shape $(4, 4)$)
 
 ### 4. Hidden-layer parameter gradients: $dW_1$ and $db_1$
 
@@ -948,24 +1095,37 @@ $$
 
 Using our illustrative weights on the 4 XOR examples ($m = 4$):
 
-#### 1. $dZ_2 = \frac{P - Y}{4}$
+#### 1. Output error gradient $dZ_2 = \frac{P - Y}{m}$
+
+Compute the difference matrix $P - Y$:
+
 $$
-dZ_2 = \frac{1}{4} \left(
-\begin{bmatrix}
-0.475021 & 0.524979 \\
-0.109097 & 0.890903 \\
-0.668188 & 0.331812 \\
-0.182426 & 0.817574
+P - Y = \begin{bmatrix}
+0.475021 - 1 & 0.524979 - 0 \\
+0.109097 - 0 & 0.890903 - 1 \\
+0.668188 - 0 & 0.331812 - 1 \\
+0.182426 - 1 & 0.817574 - 0
 \end{bmatrix}
--
+=
 \begin{bmatrix}
-1 & 0 \\
-0 & 1 \\
-0 & 1 \\
-1 & 0
+-0.524979 &  0.524979 \\
+ 0.109097 & -0.109097 \\
+ 0.668188 & -0.668188 \\
+-0.817574 &  0.817574
 \end{bmatrix}
-\right)
-= \begin{bmatrix}
+$$
+
+Divide by batch size $m = 4$:
+
+$$
+dZ_2 = \frac{1}{4} (P - Y) = \begin{bmatrix}
+-0.524979 / 4 &  0.524979 / 4 \\
+ 0.109097 / 4 & -0.109097 / 4 \\
+ 0.668188 / 4 & -0.668188 / 4 \\
+-0.817574 / 4 &  0.817574 / 4
+\end{bmatrix}
+=
+\begin{bmatrix}
 -0.131245 &  0.131245 \\
  0.027274 & -0.027274 \\
  0.167047 & -0.167047 \\
@@ -973,18 +1133,84 @@ dZ_2 = \frac{1}{4} \left(
 \end{bmatrix}
 $$
 
-#### 2. $dW_2 = A_1^T dZ_2$ and $db_2 = \sum dZ_2$
+#### 2. Output parameter gradients: $dW_2 = A_1^T dZ_2$ and $db_2 = \sum dZ_2$
+
+Transpose $A_1$ (shape $(4, 4)$):
+
+$$
+A_1^T = \begin{bmatrix}
+0.1 & 1.1 & 0.6 & 1.6 \\
+0.1 & 0.6 & 0.0 & 0.1 \\
+0.1 & 0.0 & 1.1 & 0.1 \\
+0.1 & 0.0 & 0.0 & 0.0
+\end{bmatrix}
+$$
+
+Compute the matrix product $dW_2 = A_1^T dZ_2$ of shape $(4, 2)$:
+- **Neuron 1 ($j = 0$, Class 0)**:
+  $0.1 \times (-0.131245) + 1.1 \times 0.027274 + 0.6 \times 0.167047 + 1.6 \times (-0.204394) = -0.209924$
+- **Neuron 1 ($j = 0$, Class 1)**:
+  $0.1 \times 0.131245 + 1.1 \times (-0.027274) + 0.6 \times (-0.167047) + 1.6 \times 0.204394 = +0.209924$
+- **Neuron 2 ($j = 1$, Class 0)**:
+  $0.1 \times (-0.131245) + 0.6 \times 0.027274 + 0.0 \times 0.167047 + 0.1 \times (-0.204394) = -0.017199$
+- **Neuron 2 ($j = 1$, Class 1)**:
+  $0.1 \times 0.131245 + 0.6 \times (-0.027274) + 0.0 \times (-0.167047) + 0.1 \times 0.204394 = +0.017199$
+- **Neuron 3 ($j = 2$, Class 0)**:
+  $0.1 \times (-0.131245) + 0.0 \times 0.027274 + 1.1 \times 0.167047 + 0.1 \times (-0.204394) = +0.150188$
+- **Neuron 3 ($j = 2$, Class 1)**:
+  $0.1 \times 0.131245 + 0.0 \times (-0.027274) + 1.1 \times (-0.167047) + 0.1 \times 0.204394 = -0.150188$
+- **Neuron 4 ($j = 3$, Class 0)**:
+  $0.1 \times (-0.131245) + 0.0 + 0.0 + 0.0 = -0.013124$
+- **Neuron 4 ($j = 3$, Class 1)**:
+  $0.1 \times 0.131245 + 0.0 + 0.0 + 0.0 = +0.013124$
+
+Yielding:
+
 $$
 dW_2 = \begin{bmatrix}
 -0.209924 &  0.209924 \\
 -0.017199 &  0.017199 \\
  0.150188 & -0.150188 \\
 -0.013124 &  0.013124
-\end{bmatrix}, \qquad
+\end{bmatrix}
+$$
+
+Sum down columns of $dZ_2$ to obtain $db_2$:
+- Class 0: $-0.131245 + 0.027274 + 0.167047 - 0.204394 = -0.141317$
+- Class 1: $0.131245 - 0.027274 - 0.167047 + 0.204394 = +0.141317$
+
+$$
 db_2 = \begin{bmatrix} -0.141317 & 0.141317 \end{bmatrix}
 $$
 
-#### 3. $dA_1 = dZ_2 W_2^T$
+#### 3. Hidden activation gradient $dA_1 = dZ_2 W_2^T$
+
+Transpose $W_2$ (shape $(2, 4)$):
+
+$$
+W_2^T = \begin{bmatrix}
+-0.5 & -1.0 &  0.5 & -0.5 \\
+ 0.5 &  1.0 & -0.5 &  0.5
+\end{bmatrix}
+$$
+
+Multiply $dZ_2$ of shape $(4, 2)$ by $W_2^T$ of shape $(2, 4)$:
+
+$$
+dA_1 = \begin{bmatrix}
+-0.131245 &  0.131245 \\
+ 0.027274 & -0.027274 \\
+ 0.167047 & -0.167047 \\
+-0.204394 &  0.204394
+\end{bmatrix}
+\begin{bmatrix}
+-0.5 & -1.0 &  0.5 & -0.5 \\
+ 0.5 &  1.0 & -0.5 &  0.5
+\end{bmatrix}
+$$
+
+Each cell $(i, j)$ is $dZ_{2, i, 0} \times W_{2, j, 0} + dZ_{2, i, 1} \times W_{2, j, 1}$:
+
 $$
 dA_1 = \begin{bmatrix}
  0.131245 &  0.262490 & -0.131245 &  0.131245 \\
@@ -994,8 +1220,39 @@ dA_1 = \begin{bmatrix}
 \end{bmatrix}
 $$
 
-#### 4. $dZ_1 = dA_1 \odot (Z_1 > 0)$
-Masked by whether $Z_1 > 0$:
+#### 4. ReLU backward mask $dZ_1 = dA_1 \odot (Z_1 > 0)$
+
+Evaluate the boolean activation condition $(Z_1 > 0)$:
+
+$$
+(Z_1 > 0) = \begin{bmatrix}
+0.1 > 0 & 0.1 > 0 & 0.1 > 0 & 0.1 > 0 \\
+1.1 > 0 & 0.6 > 0 & -0.9 > 0 & -0.4 > 0 \\
+0.6 > 0 & -0.4 > 0 & 1.1 > 0 & -0.9 > 0 \\
+1.6 > 0 & 0.1 > 0 & 0.1 > 0 & -1.4 > 0
+\end{bmatrix}
+=
+\begin{bmatrix}
+1 & 1 & 1 & 1 \\
+1 & 1 & 0 & 0 \\
+1 & 0 & 1 & 0 \\
+1 & 1 & 1 & 0
+\end{bmatrix}
+$$
+
+Element-wise product $dZ_1 = dA_1 \odot (Z_1 > 0)$:
+
+$$
+dZ_1 = \begin{bmatrix}
+ 0.131245 \times 1 &  0.262490 \times 1 & -0.131245 \times 1 &  0.131245 \times 1 \\
+-0.027274 \times 1 & -0.054548 \times 1 &  0.027274 \times 0 & -0.027274 \times 0 \\
+-0.167047 \times 1 & -0.334094 \times 0 &  0.167047 \times 1 & -0.167047 \times 0 \\
+ 0.204394 \times 1 &  0.408787 \times 1 & -0.204394 \times 1 &  0.204394 \times 0
+\end{bmatrix}
+$$
+
+Yielding:
+
 $$
 dZ_1 = \begin{bmatrix}
  0.131245 &  0.262490 & -0.131245 &  0.131245 \\
@@ -1005,12 +1262,45 @@ dZ_1 = \begin{bmatrix}
 \end{bmatrix}
 $$
 
-#### 5. $dW_1 = X^T dZ_1$ and $db_1 = \sum dZ_1$
+#### 5. Hidden parameter gradients: $dW_1 = X^T dZ_1$ and $db_1 = \sum dZ_1$
+
+Transpose $X$ (shape $(2, 4)$):
+
+$$
+X^T = \begin{bmatrix}
+0 & 0 & 1 & 1 \\
+0 & 1 & 0 & 1
+\end{bmatrix}
+$$
+
+Compute $dW_1 = X^T dZ_1$ of shape $(2, 4)$:
+- **Row 0 ($x_1$ weights, sum of Rows 2 and 3 of $dZ_1$)**:
+  - Neuron 1: $-0.167047 + 0.204394 = 0.037347$
+  - Neuron 2: $0.000000 + 0.408787 = 0.408787$
+  - Neuron 3: $0.167047 - 0.204394 = -0.037347$
+  - Neuron 4: $0.000000 + 0.000000 = 0.000000$
+- **Row 1 ($x_2$ weights, sum of Rows 1 and 3 of $dZ_1$)**:
+  - Neuron 1: $-0.027274 + 0.204394 = 0.177119$
+  - Neuron 2: $-0.054548 + 0.408787 = 0.354239$
+  - Neuron 3: $0.000000 - 0.204394 = -0.204394$
+  - Neuron 4: $0.000000 + 0.000000 = 0.000000$
+
+Yielding:
+
 $$
 dW_1 = \begin{bmatrix}
 0.037347 & 0.408787 & -0.037347 & 0.000000 \\
 0.177119 & 0.354239 & -0.204394 & 0.000000
-\end{bmatrix}, \qquad
+\end{bmatrix}
+$$
+
+Sum down columns of $dZ_1$ to obtain $db_1$:
+- Neuron 1: $0.131245 - 0.027274 - 0.167047 + 0.204394 = 0.141317$
+- Neuron 2: $0.262490 - 0.054548 + 0.000000 + 0.408787 = 0.616728$
+- Neuron 3: $-0.131245 + 0.000000 + 0.167047 - 0.204394 = -0.168591$
+- Neuron 4: $0.131245 + 0.000000 + 0.000000 + 0.000000 = 0.131245$
+
+$$
 db_1 = \begin{bmatrix} 0.141317 & 0.616728 & -0.168591 & 0.131245 \end{bmatrix}
 $$
 
@@ -1018,7 +1308,13 @@ $$
 
 ## Q8 — Gradient-descent update
 
-With learning rate $\eta$ (e.g. $\eta = 0.1$):
+Gradient descent updates each parameter in the opposite direction of its gradient, scaled by the learning rate $\eta$:
+
+$$
+\theta \leftarrow \theta - \eta \, \nabla_\theta L
+$$
+
+For our two-layer neural network with learning rate $\eta = 0.1$:
 
 $$
 \begin{aligned}
@@ -1029,7 +1325,154 @@ b_2 &\leftarrow b_2 - \eta \, db_2
 \end{aligned}
 $$
 
-Each epoch executes:
+### Step-by-step arithmetic calculations ($\eta = 0.1$)
+
+#### 1. Hidden weight matrix update ($W_1 \leftarrow W_1 - 0.1 \times dW_1$):
+
+$$
+W_1 = \begin{bmatrix}
+ 0.5 & -0.5 &  1.0 & -1.0 \\
+ 1.0 &  0.5 & -1.0 & -0.5
+\end{bmatrix}, \qquad
+dW_1 = \begin{bmatrix}
+0.037347 & 0.408787 & -0.037347 & 0.000000 \\
+0.177119 & 0.354239 & -0.204394 & 0.000000
+\end{bmatrix}
+$$
+
+Compute scaled gradient $0.1 \times dW_1$:
+
+$$
+0.1 \times dW_1 = \begin{bmatrix}
+0.003735 & 0.040879 & -0.003735 & 0.000000 \\
+0.017712 & 0.035424 & -0.020439 & 0.000000
+\end{bmatrix}
+$$
+
+Subtract from $W_1$:
+
+$$
+W_{1, \text{new}} = \begin{bmatrix}
+0.5 - 0.003735 & -0.5 - 0.040879 & 1.0 - (-0.003735) & -1.0 - 0.000000 \\
+1.0 - 0.017712 &  0.5 - 0.035424 & -1.0 - (-0.020439) & -0.5 - 0.000000
+\end{bmatrix}
+$$
+
+$$
+W_{1, \text{new}} = \begin{bmatrix}
+0.496265 & -0.540879 &  1.003735 & -1.000000 \\
+0.982288 &  0.464576 & -0.979561 & -0.500000
+\end{bmatrix}
+$$
+
+#### 2. Hidden bias vector update ($b_1 \leftarrow b_1 - 0.1 \times db_1$):
+
+$$
+b_1 = \begin{bmatrix} 0.1 & 0.1 & 0.1 & 0.1 \end{bmatrix}, \qquad
+db_1 = \begin{bmatrix} 0.141317 & 0.616728 & -0.168591 & 0.131245 \end{bmatrix}
+$$
+
+Compute scaled gradient $0.1 \times db_1$:
+
+$$
+0.1 \times db_1 = \begin{bmatrix} 0.014132 & 0.061673 & -0.016859 & 0.013125 \end{bmatrix}
+$$
+
+Subtract from $b_1$:
+
+$$
+b_{1, \text{new}} = \begin{bmatrix}
+0.1 - 0.014132 & 0.1 - 0.061673 & 0.1 - (-0.016859) & 0.1 - 0.013125
+\end{bmatrix}
+$$
+
+$$
+b_{1, \text{new}} = \begin{bmatrix} 0.085868 & 0.038327 & 0.116859 & 0.086875 \end{bmatrix}
+$$
+
+#### 3. Output weight matrix update ($W_2 \leftarrow W_2 - 0.1 \times dW_2$):
+
+$$
+W_2 = \begin{bmatrix}
+-0.5 &  0.5 \\
+-1.0 &  1.0 \\
+ 0.5 & -0.5 \\
+-0.5 &  0.5
+\end{bmatrix}, \qquad
+dW_2 = \begin{bmatrix}
+-0.209924 &  0.209924 \\
+-0.017199 &  0.017199 \\
+ 0.150188 & -0.150188 \\
+-0.013124 &  0.013124
+\end{bmatrix}
+$$
+
+Compute scaled gradient $0.1 \times dW_2$:
+
+$$
+0.1 \times dW_2 = \begin{bmatrix}
+-0.020992 &  0.020992 \\
+-0.001720 &  0.001720 \\
+ 0.015019 & -0.015019 \\
+-0.001312 &  0.001312
+\end{bmatrix}
+$$
+
+Subtract from $W_2$:
+
+$$
+W_{2, \text{new}} = \begin{bmatrix}
+-0.5 - (-0.020992) &  0.5 - 0.020992 \\
+-1.0 - (-0.001720) &  1.0 - 0.001720 \\
+ 0.5 - 0.015019    & -0.5 - (-0.015019) \\
+-0.5 - (-0.001312) &  0.5 - 0.001312
+\end{bmatrix}
+$$
+
+$$
+W_{2, \text{new}} = \begin{bmatrix}
+-0.479008 &  0.479008 \\
+-0.998280 &  0.998280 \\
+ 0.484981 & -0.484981 \\
+-0.498688 &  0.498688
+\end{bmatrix}
+$$
+
+#### 4. Output bias vector update ($b_2 \leftarrow b_2 - 0.1 \times db_2$):
+
+$$
+b_2 = \begin{bmatrix} 0.1 & -0.1 \end{bmatrix}, \qquad
+db_2 = \begin{bmatrix} -0.141317 & 0.141317 \end{bmatrix}
+$$
+
+Compute scaled gradient $0.1 \times db_2$:
+
+$$
+0.1 \times db_2 = \begin{bmatrix} -0.014132 & 0.014132 \end{bmatrix}
+$$
+
+Subtract from $b_2$:
+
+$$
+b_{2, \text{new}} = \begin{bmatrix} 0.1 - (-0.014132) & -0.1 - 0.014132 \end{bmatrix}
+= \begin{bmatrix} 0.114132 & -0.114132 \end{bmatrix}
+$$
+
+### Impact of 1 Gradient Descent Step on Loss
+
+Re-evaluating the batch forward pass with updated parameters:
+
+| Metric | Before Step (Initial) | After 1 Step ($\eta = 0.1$) | Change |
+|:---|:---|:---|:---|
+| **Cross-Entropy Loss** | $0.916129$ | $0.838500$ | **$-0.077629$ (Decreased)** |
+| **Example 0 Loss ($[0, 0]$)** | $0.744396$ | $0.679140$ | Improved |
+| **Example 1 Loss ($[0, 1]$)** | $0.115520$ | $0.098412$ | Improved |
+| **Example 2 Loss ($[1, 0]$)** | $1.103187$ | $1.021505$ | Improved |
+| **Example 3 Loss ($[1, 1]$)** | $1.701411$ | $1.554942$ | Improved |
+
+Repeating this cycle for 2000 epochs with learning rate $\eta = 1.0$ converges loss from $0.916129 \to 0.000478$, reaching $100\%$ classification accuracy on XOR.
+
+Each training epoch executes:
 ```text
 Forward Pass -> Loss Evaluation -> Backpropagation -> Parameter Update
 ```
@@ -1039,53 +1482,202 @@ Forward Pass -> Loss Evaluation -> Backpropagation -> Parameter Update
 ## Q9 — Parameter initialization mathematics
 
 ### 1. The symmetry-breaking problem
-If all weights are initialized to 0:
-- $Z_1 = 0 + b_1$
-- Every hidden neuron computes the identical activation: $a_{1, 1} = a_{1, 2} = a_{1, 3} = a_{1, 4}$
-- In backpropagation, every hidden neuron receives the identical gradient: $dW_{1, j}$ are all identical
-- The hidden neurons can never specialize to detect different geometric features. Symmetry must be broken with random initialization.
 
-### 2. He (Kaiming) initialization for ReLU layers
-To prevent vanishing or exploding activations across layers, the variance of the outputs should equal the variance of the inputs:
+If all weights are initialized to 0 ($W_1 = \mathbf{0}$, $W_2 = \mathbf{0}$, $b_1 = \mathbf{0}$, $b_2 = \mathbf{0}$):
+- For any input $x$, hidden pre-activation is zero: $z_{1, j} = 0$.
+- Every hidden neuron outputs the identical activation: $a_{1, 1} = a_{1, 2} = a_{1, 3} = a_{1, 4} = \operatorname{ReLU}(0) = 0$.
+- In backpropagation, every hidden neuron receives the identical error gradient:
+  $$
+  dW_{1, 1} = dW_{1, 2} = dW_{1, 3} = dW_{1, 4}
+  $$
+- After the gradient descent update, all weights remain identical. The network acts as if it has only **1 hidden neuron**, making it mathematically impossible to learn non-linear functions like XOR.
+- Random initialization breaks this symmetry, allowing each neuron to specialize in detecting different feature combinations.
+
+### 2. He (Kaiming) initialization for ReLU Layer 1
+
+Because ReLU sets all negative values to zero ($\max(0, z)$), it deactivates approximately half of the neurons, cutting the variance of activations in half:
+
+$$
+\operatorname{Var}(a) = \frac{1}{2}\operatorname{Var}(z)
+$$
+
+To prevent activations from vanishing toward zero as signals propagate deeper, He initialization compensates by doubling the variance:
 
 $$
 \operatorname{Var}(W_1) = \frac{2}{n_{\text{in}}}
 $$
 
-Where $n_{\text{in}} = 2$ for the XOR input layer:
+Taking the square root gives the required standard deviation $\sigma$:
 
 $$
-W_1 \sim \mathcal{N}\left(0, \, \sigma = \sqrt{\frac{2}{n_{\text{in}}}}\right)
+\sigma_{W_1} = \sqrt{\frac{2}{n_{\text{in}}}}
 $$
 
-### 3. Xavier / Glorot initialization for Softmax layers
-For layers without ReLU:
+#### Calculation for XOR Layer 1:
+- Input feature count: $n_{\text{in}} = 2$
+- Hidden neuron count: $n_{\text{hidden}} = 4$
 
 $$
-W_2 \sim \mathcal{N}\left(0, \, \sigma = \sqrt{\frac{2}{n_{\text{in}} + n_{\text{out}}}}\right)
+\sigma_{W_1} = \sqrt{\frac{2}{2}} = \sqrt{1.0} = 1.000000
 $$
 
-Biases are safely initialized to zeros: $b_1 = \mathbf{0}_{(1, 4)}$, $b_2 = \mathbf{0}_{(1, 2)}$.
+Weights are drawn from $\mathcal{N}(0, 1.0)$ with shape $(2, 4)$:
+
+$$
+W_1 \sim \mathcal{N}(0, 1.0)
+$$
+
+Using seed 42 in `ann.py`:
+
+$$
+W_1 = \begin{bmatrix}
+ 0.496714 & -0.138264 & 0.647689 & 1.523030 \\
+-0.234153 & -0.234137 & 1.579213 & 0.767435
+\end{bmatrix}
+$$
+
+### 3. Xavier / Glorot initialization for Softmax Layer 2
+
+For linear and softmax layers, signals do not experience the half-plane cut of ReLU. Xavier initialization maintains constant activation and gradient variances by scaling by the harmonic mean of fan-in and fan-out:
+
+$$
+\operatorname{Var}(W_2) = \frac{2}{n_{\text{in}} + n_{\text{out}}} = \frac{2}{n_{\text{hidden}} + n_{\text{out}}}
+$$
+
+Taking the square root:
+
+$$
+\sigma_{W_2} = \sqrt{\frac{2}{n_{\text{hidden}} + n_{\text{out}}}}
+$$
+
+#### Calculation for XOR Layer 2:
+- Hidden neuron count: $n_{\text{hidden}} = 4$
+- Output class count: $n_{\text{out}} = 2$
+
+$$
+\sigma_{W_2} = \sqrt{\frac{2}{4 + 2}} = \sqrt{\frac{2}{6}} = \sqrt{\frac{1}{3}} \approx 0.577350
+$$
+
+Weights are drawn from $\mathcal{N}(0, 0.577350)$ with shape $(4, 2)$:
+
+$$
+W_2 \sim \mathcal{N}(0, 0.577350)
+$$
+
+Using seed 42 in `ann.py`:
+
+$$
+W_2 = \begin{bmatrix}
+-0.271051 &  0.313247 \\
+-0.267554 & -0.268889 \\
+ 0.139697 & -1.104633 \\
+-0.995882 & -0.324637
+\end{bmatrix}
+$$
+
+### 4. Bias initialization
+
+Biases do not suffer from the symmetry-breaking problem because random weights already ensure each neuron receives distinct gradients. Biases are safely initialized to zeros:
+
+$$
+b_1 = \begin{bmatrix} 0.0 & 0.0 & 0.0 & 0.0 \end{bmatrix} \in \mathbb{R}^{1 \times 4}
+$$
+
+$$
+b_2 = \begin{bmatrix} 0.0 & 0.0 \end{bmatrix} \in \mathbb{R}^{1 \times 2}
+$$
 
 ---
 
 ## Q10 — Prediction and evaluation metrics
 
-### 1. Decision rule
-Softmax outputs probabilities $P \in \mathbb{R}^{m \times 2}$. The predicted class label $\hat{y}$ is the index of the highest probability:
+### 1. Decision rule: $\hat{y} = \operatorname{argmax}(P)$
+
+Softmax produces a probability distribution $P \in \mathbb{R}^{m \times 2}$ where $P_{i, 0} + P_{i, 1} = 1.0$.
+The predicted class label $\hat{y}_i \in \{0, 1\}$ is the index of the class with higher probability:
 
 $$
-\hat{y}_i = \operatorname{argmax}(P_{i, :})
+\hat{y}_i = \operatorname{argmax}_{c \in \{0, 1\}}(P_{i, c}) = \begin{cases} 0 & \text{if } P_{i, 0} > P_{i, 1} \\ 1 & \text{if } P_{i, 1} \geq P_{i, 0} \end{cases}
 $$
 
-### 2. Accuracy metric
-Accuracy measures the proportion of correctly classified examples:
+### 2. Accuracy metric calculation
+
+Accuracy measures the proportion of samples classified correctly:
 
 $$
-\text{Accuracy} = \frac{1}{m} \sum_{i=1}^{m} \mathbb{I}(\hat{y}_i == y_i)
+\text{Accuracy} = \frac{1}{m}\sum_{i=1}^{m} \mathbb{I}(\hat{y}_i == y_i)
 $$
 
-Where $\mathbb{I}(\cdot)$ is the indicator function ($1$ if true, $0$ if false).
+Where $\mathbb{I}(\cdot)$ is the indicator function:
+- $\mathbb{I}(\text{true}) = 1$ (correct prediction)
+- $\mathbb{I}(\text{false}) = 0$ (incorrect prediction)
+
+### 3. Concrete numerical calculation: Before Training vs After Training
+
+#### A. Initial Untrained State (Using illustrative parameters)
+
+$$
+P = \begin{bmatrix}
+0.475021 & 0.524979 \\
+0.109097 & 0.890903 \\
+0.668188 & 0.331812 \\
+0.182426 & 0.817574
+\end{bmatrix}, \qquad
+Y = \begin{bmatrix}
+1 & 0 \\
+0 & 1 \\
+0 & 1 \\
+1 & 0
+\end{bmatrix}
+$$
+
+Ground-truth labels: $y = [0, 1, 1, 0]$
+
+- **Example 0 ($[0, 0]$)**: $P = [0.475, 0.525] \implies \operatorname{argmax} \to \hat{y}_0 = 1$. Ground truth: $y_0 = 0$. Match: $\mathbb{I}(1 == 0) = 0$ (Incorrect).
+- **Example 1 ($[0, 1]$)**: $P = [0.109, 0.891] \implies \operatorname{argmax} \to \hat{y}_1 = 1$. Ground truth: $y_1 = 1$. Match: $\mathbb{I}(1 == 1) = 1$ (Correct).
+- **Example 2 ($[1, 0]$)**: $P = [0.668, 0.332] \implies \operatorname{argmax} \to \hat{y}_2 = 0$. Ground truth: $y_2 = 1$. Match: $\mathbb{I}(0 == 1) = 0$ (Incorrect).
+- **Example 3 ($[1, 1]$)**: $P = [0.182, 0.818] \implies \operatorname{argmax} \to \hat{y}_3 = 1$. Ground truth: $y_3 = 0$. Match: $\mathbb{I}(1 == 0) = 0$ (Incorrect).
+
+Predictions: $\hat{y} = [1, 1, 0, 1]$
+
+$$
+\text{Accuracy}_{\text{initial}} = \frac{0 + 1 + 0 + 0}{4} = \frac{1}{4} = 0.25 = 25.0\%
+$$
+
+$$
+\text{Loss}_{\text{initial}} = 0.916129
+$$
+
+#### B. Final Trained State (After 2000 epochs, $\eta = 1.0$)
+
+Trained probability matrix $P$:
+
+$$
+P = \begin{bmatrix}
+0.998674 & 0.001326 \\
+0.000265 & 0.999735 \\
+0.000164 & 0.999836 \\
+0.999843 & 0.000157
+\end{bmatrix}
+$$
+
+Evaluating $\operatorname{argmax}$:
+- **Example 0 ($[0, 0]$)**: $P = [0.9987, 0.0013] \implies \hat{y}_0 = 0$. Ground truth: $0$. Match: $\mathbb{I}(0 == 0) = 1$ (Correct, 99.87% confidence).
+- **Example 1 ($[0, 1]$)**: $P = [0.0003, 0.9997] \implies \hat{y}_1 = 1$. Ground truth: $1$. Match: $\mathbb{I}(1 == 1) = 1$ (Correct, 99.97% confidence).
+- **Example 2 ($[1, 0]$)**: $P = [0.0002, 0.9998] \implies \hat{y}_2 = 1$. Ground truth: $1$. Match: $\mathbb{I}(1 == 1) = 1$ (Correct, 99.98% confidence).
+- **Example 3 ($[1, 1]$)**: $P = [0.9998, 0.0002] \implies \hat{y}_3 = 0$. Ground truth: $0$. Match: $\mathbb{I}(0 == 0) = 1$ (Correct, 99.98% confidence).
+
+Predictions: $\hat{y} = [0, 1, 1, 0]$
+
+$$
+\text{Accuracy}_{\text{trained}} = \frac{1 + 1 + 1 + 1}{4} = \frac{4}{4} = 1.00 = 100.0\%
+$$
+
+$$
+\text{Loss}_{\text{trained}} = 0.000478
+$$
+
+The non-linear XOR separation is solved completely.
 
 
 ---
@@ -1093,31 +1685,38 @@ Where $\mathbb{I}(\cdot)$ is the indicator function ($1$ if true, $0$ if false).
 ## Summary of the complete mathematical pipeline
 
 ```text
+0. Parameter Initialization (Symmetry Breaking)
+   W1 ~ N(0, sigma = sqrt(2 / n_in))                     shape: (2, 4)  [He Normal]
+   b1 = zeros((1, 4))                                    shape: (1, 4)
+   W2 ~ N(0, sigma = sqrt(2 / (n_hidden + n_out)))       shape: (4, 2)  [Xavier Normal]
+   b2 = zeros((1, 2))                                    shape: (1, 2)
+
 1. Forward Pass
-   Z1 = X @ W1 + b1                   shape: (4, 2) @ (2, 4) + (1, 4) -> (4, 4)
-   A1 = max(0, Z1)                    shape: (4, 4)
-   Z2 = A1 @ W2 + b2                  shape: (4, 4) @ (4, 2) + (1, 2) -> (4, 2)
-   P  = softmax_batch(Z2)             shape: (4, 2)
+   Z1 = X @ W1 + b1                                      shape: (4, 2) @ (2, 4) + (1, 4) -> (4, 4)
+   A1 = relu(Z1) = max(0, Z1)                            shape: (4, 4)
+   Z2 = A1 @ W2 + b2                                     shape: (4, 4) @ (4, 2) + (1, 2) -> (4, 2)
+   P  = softmax(Z2)                                      shape: (4, 2)
 
-2. Loss
-   L  = -mean(sum(Y * log(P), axis=1))
+2. Loss Evaluation
+   L  = -mean(sum(Y * log(clip(P, eps, 1-eps)), axis=1)) scalar (Cross-Entropy)
 
-3. Backpropagation
-   dZ2 = (P - Y) / m                  shape: (4, 2)
-   dW2 = A1.T @ dZ2                   shape: (4, 4) @ (4, 2) -> (4, 2)
-   db2 = sum(dZ2, axis=0)             shape: (1, 2)
-   dA1 = dZ2 @ W2.T                   shape: (4, 2) @ (2, 4) -> (4, 4)
-   dZ1 = dA1 * (Z1 > 0)               shape: (4, 4)
-   dW1 = X.T @ dZ1                    shape: (2, 4) @ (4, 4) -> (2, 4)
-   db1 = sum(dZ1, axis=0)             shape: (1, 4)
+3. Backpropagation (Chain Rule)
+   dZ2 = (P - Y) / m                                     shape: (4, 2)
+   dW2 = A1.T @ dZ2                                      shape: (4, 4) @ (4, 2) -> (4, 2)
+   db2 = sum(dZ2, axis=0, keepdims=True)                 shape: (1, 2)
+   dA1 = dZ2 @ W2.T                                      shape: (4, 2) @ (2, 4) -> (4, 4)
+   dZ1 = dA1 * (Z1 > 0)                                  shape: (4, 4)
+   dW1 = X.T @ dZ1                                       shape: (2, 4) @ (4, 4) -> (2, 4)
+   db1 = sum(dZ1, axis=0, keepdims=True)                 shape: (1, 4)
 
-4. Parameter Update
-   W1 = W1 - lr * dW1
-   b1 = b1 - lr * db1
-   W2 = W2 - lr * dW2
-   b2 = b2 - lr * db2
+4. Parameter Update (Gradient Descent)
+   W1 = W1 - lr * dW1                                    shape: (2, 4)
+   b1 = b1 - lr * db1                                    shape: (1, 4)
+   W2 = W2 - lr * dW2                                    shape: (4, 2)
+   b2 = b2 - lr * db2                                    shape: (1, 2)
 
-5. Evaluation
-   predictions = argmax(P, axis=1)
-   accuracy    = mean(predictions == y_true)
+5. Prediction & Evaluation
+   y_true      = argmax(Y, axis=1)                       shape: (4,)
+   predictions = argmax(P, axis=1)                       shape: (4,)
+   accuracy    = mean(predictions == y_true)             scalar (0.0 to 1.0)
 ```
