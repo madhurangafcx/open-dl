@@ -116,22 +116,28 @@ For token `i`:
 ---
 
 ### 5. Multi-Head Attention (MHA)
-Instead of performing a single attention function, Multi-Head Attention linearly projects Queries, Keys, and Values `h` times with distinct, learnable projection matrices:
+Instead of performing a single attention function, Multi-Head Attention projects the input representation `h` times into distinct Query, Key, and Value subspaces:
 
 ```math
-\mathrm{MultiHead}(Q, K, V) = \operatorname{Concat}(\mathrm{head}_1, \mathrm{head}_2, \dots, \mathrm{head}_h) W^O
+\mathrm{MultiHead}(X) = \operatorname{Concat}(\mathrm{head}_1, \mathrm{head}_2, \dots, \mathrm{head}_h) W^O
 ```
 
-Where each individual head computes:
+For self-attention with input representation `X \in \mathbb{R}^{T \times d_{\mathrm{model}}}`, each individual head computes:
 
 ```math
-\mathrm{head}_i = \mathrm{Attention}\left(Q W_i^Q, K W_i^K, V W_i^V\right) \in \mathbb{R}^{T \times d_v}
+\mathrm{head}_i = \mathrm{Attention}\left(X W_i^Q, X W_i^K, X W_i^V\right) \in \mathbb{R}^{T \times d_v}
+```
+
+For general attention where Queries originate from sequence `X_Q` and Keys/Values originate from sequence `X_{KV}` (such as in decoder-encoder cross-attention):
+
+```math
+\mathrm{head}_i = \mathrm{Attention}\left(X_Q W_i^Q, X_{KV} W_i^K, X_{KV} W_i^V\right) \in \mathbb{R}^{T \times d_v}
 ```
 
 And:
-- `W_i^Q \in \mathbb{R}^{d_{\mathrm{model}} \times d_k}`
-- `W_i^K \in \mathbb{R}^{d_{\mathrm{model}} \times d_k}`
-- `W_i^V \in \mathbb{R}^{d_{\mathrm{model}} \times d_v}`
+- `W_i^Q \in \mathbb{R}^{d_{\mathrm{model}} \times d_k}`: Head `i` Query projection matrix.
+- `W_i^K \in \mathbb{R}^{d_{\mathrm{model}} \times d_k}`: Head `i` Key projection matrix.
+- `W_i^V \in \mathbb{R}^{d_{\mathrm{model}} \times d_v}`: Head `i` Value projection matrix.
 - `W^O \in \mathbb{R}^{(h \cdot d_v) \times d_{\mathrm{model}}}`: Output projection mixing representations across all heads.
 
 ---
@@ -384,7 +390,7 @@ A_{\mathrm{causal}} = \begin{bmatrix}
 ```
 
 > [!NOTE]
-> In our pure NumPy implementation using literal `-np.inf`, masked entries evaluate to exact mathematical zeros (`exp(-inf) == 0.0`). In deep learning frameworks and mixed-precision routines (e.g., FP16), large finite negative constants such as `-1e9` or `-1e4` are commonly substituted to prevent NaN artifacts, yielding numerically negligible weights rather than exact zeros.
+> In our pure NumPy implementation, literal `-np.inf` makes masked logits contribute exactly zero after exponentiation (`exp(-inf) == 0.0`). In practical implementations, masking may instead use `-inf` or a sufficiently large negative value chosen to be representable in the target dtype. The exact choice depends on numerical precision and the implementation.
 
 ---
 
