@@ -87,7 +87,7 @@ S_{\mathrm{scaled}} = \frac{Q K^T}{\sqrt{d_k}} \in \mathbb{R}^{T \times T}
 The scaled scores are normalized row-by-row into non-negative probabilities summing to `1.0`:
 
 ```math
-A = \operatorname{softmax}\left(S_{\mathrm{scaled}}\right) = \operatorname{softmax}\left(\frac{Q K^T}{\sqrt{d_k}}\right) \in (0, 1)^{T \times T}
+A = \operatorname{softmax}\left(S_{\mathrm{scaled}}\right) = \operatorname{softmax}\left(\frac{Q K^T}{\sqrt{d_k}}\right) \in [0, 1]^{T \times T}
 ```
 
 For each query token `i`:
@@ -96,7 +96,7 @@ For each query token `i`:
 A_{i, j} = \frac{\exp\left(\frac{q_i \cdot k_j}{\sqrt{d_k}}\right)}{\sum_{m=1}^{T} \exp\left(\frac{q_i \cdot k_m}{\sqrt{d_k}}\right)}, \quad \sum_{j=1}^{T} A_{i, j} = 1.0
 ```
 
-Where `A_{i, j}` represents the exact **attention weight** (fraction of focus) that token `i` allocates to token `j`.
+Where `A_{i, j}` is the normalized attention weight assigned by query `i` to key `j`. It can be interpreted intuitively as the fraction of attention allocated to that key.
 
 ---
 
@@ -162,7 +162,7 @@ FLAW 2: THE FIXED-DIMENSIONAL INFORMATION BOTTLENECK
 Modern hardware accelerators (NVIDIA GPUs, Google TPUs) achieve extreme floating-point throughput by executing tens of thousands of matrix operations in **parallel**.
 - In an RNN, step `t` strictly requires the output `h_{t-1}` from the preceding step.
 - As sequence length `T` grows from `50` to `4,096`, the sequential execution graph grows linearly `O(T)`.
-- **Self-attention eliminates recurrence**: all `T` token representations can be projected and their pairwise similarities computed in parallel, with `O(1)` sequential depth. The actual computational work remains approximately `O(T^2 \cdot d)`.
+- **Self-attention eliminates recurrence**: all `T` token representations can be projected and their pairwise similarities computed in parallel, with `O(1)` sequential depth. While the pairwise attention score and value mixing operation requires `O(T^2 \cdot d)` work, the complete Multi-Head Attention layer (including projections) has total computational cost approximately `O(T \cdot d_{\mathrm{model}}^2 + T^2 \cdot d_{\mathrm{model}})`.
 
 ---
 
@@ -205,7 +205,7 @@ Token 1 ("The") ................................................. Token T ("was"
 
 ## Conceptual Analogy: The Database Information Retrieval Intuition
 
-The terms **Query (Q)**, **Key (K)**, and **Value (V)** originate from classical database search and information retrieval:
+The terms **Query (Q)**, **Key (K)**, and **Value (V)** have a useful analogy to database search and information retrieval:
 
 ```text
 ====================================================================================================
@@ -298,7 +298,7 @@ Therefore, the **standard deviation** of the unscaled dot product is:
 ```
 
 > [!NOTE]
-> This derivation represents an idealized statistical argument under standard independent zero-mean and unit-variance initialization assumptions (e.g., standard normal or Xavier initialization). It provides the theoretical rationale for introducing the scaling factor at initialization, rather than guaranteeing that trained Query and Key vectors maintain these exact distributions throughout optimization.
+> This is an idealized variance argument assuming independent zero-mean Query and Key components with unit variance. Actual initialization schemes need not produce these exact statistics.
 
 ---
 
@@ -355,7 +355,7 @@ Masked Attention (Causal / Decoder):
 A causal mask `M \in \{0, -\infty\}^{T \times T}` is an upper-triangular matrix:
 
 ```math
-M_{i, j} = \begin{cases} 0 & \text{if } j \le i \quad (\text{Past or Present}) \\ -\infty & \text{if } j > i \quad (\text{Future - Forbidden!}) \end{cases}
+M_{i, j} = \begin{cases} 0 & \text{if } j \le i \quad (\text{Allowed positions}) \\ -\infty & \text{if } j > i \quad (\text{Future - Forbidden!}) \end{cases}
 ```
 
 ```math
@@ -427,6 +427,9 @@ X \in \mathbb{R}^{B \times T \times d_{\mathrm{model}}}
    ```
 2. Reshape and transpose into multi-head tensor format:
    ```python
+   assert d_model == h * d_k, "d_model must equal h * d_k for valid tensor reshaping"
+   assert d_model == h * d_v, "d_model must equal h * d_v for valid tensor reshaping"
+
    # Split d_model into (h, d_k)
    # Shape: (B, T, d_model) -> (B, T, h, d_k) -> (B, h, T, d_k)
    Q = Q_all.reshape(B, T, h, d_k).transpose(0, 2, 1, 3)
@@ -491,9 +494,9 @@ PE_{(pos, 2i+1)} = \cos\left(\frac{pos}{10000^{2i / d_{\mathrm{model}}}}\right)
 ```
 
 Where:
-- `pos \in \{0, 1, \dots, T-1\}`: The temporal position of the token in the sequence.
+- `pos \in \{0, 1, \dots, T-1\}`: The sequence position of the token.
 - `i \in \{0, 1, \dots, d_{\mathrm{model}}/2 - 1\}`: The feature dimension index.
-- `10000^{2i / d_{\mathrm{model}}}`: The wave period scaling across dimensions (from `2\pi` to `10000 \cdot 2\pi`).
+- `10000^{2i / d_{\mathrm{model}}}`: Controls the frequency scale across dimensions, giving sinusoidal periods ranging approximately from `2\pi` to `2\pi \cdot 10000`.
 
 #### Why Sinusoids? The Linear Relative Translation Property:
 By trigonometric angle-addition identities:
@@ -503,7 +506,7 @@ By trigonometric angle-addition identities:
 ```math
 \cos(\alpha + \beta) = \cos(\alpha)\cos(\beta) - \sin(\alpha)\sin(\beta)
 ```
-For any fixed temporal distance `k`, the positional encoding at `pos + k` can be expressed as a **pure linear transformation** of the positional encoding at `pos`:
+For any fixed sequence offset `k`, the positional encoding at `pos + k` can be expressed as a **pure linear transformation** of the positional encoding at `pos`:
 ```math
 PE_{(pos + k, :)} = PE_{(pos, :)} M_k
 ```
@@ -562,7 +565,7 @@ Let:
 | `K` | `(B, h, T, d_k)` | `K \in \mathbb{R}^{B \times h \times T \times d_k}` | Multi-head key tensor |
 | `V` | `(B, h, T, d_v)` | `V \in \mathbb{R}^{B \times h \times T \times d_v}` | Multi-head value tensor |
 | `scores` | `(B, h, T, T)` | `S \in \mathbb{R}^{B \times h \times T \times T}` | Scaled pairwise similarity scores `Q K^T / \sqrt{d_k}` |
-| `attn_weights` | `(B, h, T, T)` | `A \in (0, 1)^{B \times h \times T \times T}` | Softmax attention distribution summing to 1 across rows |
+| `attn_weights` | `(B, h, T, T)` | `A \in [0, 1]^{B \times h \times T \times T}` | Softmax attention distribution summing to 1 across rows |
 | `context` | `(B, T, d_{\mathrm{model}})` | `C \in \mathbb{R}^{B \times T \times d_{\mathrm{model}}}` | Multi-head attention output after `W^O` projection |
 
 ---
@@ -606,7 +609,7 @@ Following the repository's established 10-step sequence:
 | **5. Derive Gradients** | Pending | Matrix calculus for `dQ, dK, dV`, Softmax Jacobian product, and projection gradients |
 | **6. Implement Backpropagation** | Pending | Reverse-mode automatic differentiation in NumPy verified against finite differences |
 | **7. Train Model** | Pending | Learning token-to-token associative retrieval and syntax binding |
-| **8. Debug & Analyze** | Pending | Visualizing attention heatmaps, diagonal dominance, and multi-head specialization |
+| **8. Debug & Analyze** | Pending | Visualizing attention heatmaps, diagonal self-attention patterns, and multi-head specialization |
 | **9. PyTorch Implementation** | Pending | Parity validation against `torch.nn.MultiheadAttention` down to 7 decimal places |
 | **10. Compare Results** | Pending | Runtime benchmark, memory efficiency, and numerical agreement validation |
 
@@ -653,7 +656,7 @@ SCALED DOT-PRODUCT ATTENTION
 THE ATTENTION MATRIX & SOFTMAX
 │
 ├── 22. Row-wise Softmax normalization
-├── 23. Attention weights: A_ij = P(token_j | token_i)
+├── 23. Attention weights: A_ij as the normalized attention assigned by query i to key j
 ├── 24. Numerical stability trick: Subtracting row-max
 ├── 25. Self-attention diagonal: Why tokens attend to themselves
 ├── 26. Off-diagonal elements: Syntactic and semantic dependencies
@@ -676,7 +679,7 @@ MULTI-HEAD ATTENTION (MHA)
 │
 ├── 36. Motivation: Why multiple attention heads are useful
 ├── 37. Representational subspaces (Syntax, Coreference, Logic)
-├── 38. Splitting d_model into h heads: d_k = d_model / h
+├── 38. Splitting d_model into h heads and choosing per-head dimensions
 ├── 39. Parallel multi-head computation
 ├── 40. Tensor transpositions: (B, T, d_model) -> (B, h, T, d_k)
 ├── 41. Batched matrix multiplication over heads
@@ -687,7 +690,7 @@ MULTI-HEAD ATTENTION (MHA)
 ▼
 POSITIONAL ENCODING
 │
-├── 45. Why Transformers cannot understand word order natively
+├── 45. Why pure self-attention does not encode sequence order by itself
 ├── 46. Adding position vectors to word embeddings
 ├── 47. Sinusoidal positional encodings (Vaswani et al.)
 ├── 48. Sine for even dimensions, Cosine for odd dimensions
@@ -747,7 +750,7 @@ NUMERICAL GRADIENT VERIFICATION
 ATTENTION HEATMAP VISUALIZATION
 │
 ├── 84. Plotting (T, T) attention matrices with Matplotlib / Seaborn
-├── 85. Identifying diagonal self-attention dominance
+├── 85. Analyzing diagonal self-attention patterns when present
 ├── 86. Visualizing syntactic dependencies (Adjective -> Noun)
 ├── 87. Analyzing cross-head diversity
 ├── 88. Entropy of attention distributions: Sharp vs Diffuse
