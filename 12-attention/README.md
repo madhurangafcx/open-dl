@@ -75,7 +75,7 @@ Every Query vector computes a dot product with every Key vector to measure relev
 S = Q K^T \in \mathbb{R}^{T \times T}
 ```
 
-To prevent gradient vanishing in the Softmax function when `d_k` is large, the raw scores are scaled by `\frac{1}{\sqrt{d_k}}`:
+To reduce Softmax saturation when `d_k` is large, the raw scores are scaled by `\frac{1}{\sqrt{d_k}}`:
 
 ```math
 S_{\mathrm{scaled}} = \frac{Q K^T}{\sqrt{d_k}} \in \mathbb{R}^{T \times T}
@@ -190,7 +190,7 @@ Token 1 ("The") ................................................. Token T ("was"
 ---
 
 ### Table 1 — Theoretical Comparison: Recurrent vs. Convolutional vs. Self-Attention
-*(Reproduced from Vaswani et al., 2017)*
+*(Complexity, sequential-depth, and path-length comparison adapted from Vaswani et al., 2017; memory-footprint column added for this project.)*
 
 | Layer Type | Complexity per Layer | Sequential Operations | Maximum Path Length | Memory Footprint |
 | :--- | :--- | :--- | :--- | :--- |
@@ -471,7 +471,7 @@ In pure self-attention without positional encodings:
   ```math
   \mathrm{Attention}(P X) = P \mathrm{Attention}(X)
   ```
-- **The model has zero knowledge of sequential token order!**
+- The pure self-attention mechanism has no positional information and therefore cannot distinguish sequences that differ only by token order.
 
 ---
 
@@ -761,7 +761,7 @@ NUMPY OPTIMIZATIONS
 ├── 89. Fused QKV linear projection: W_qkv in R^(d_model x 3*d_model)
 ├── 90. Einsum notation for multi-head attention: np.einsum('bhtd,bhkd->bhtk')
 ├── 91. In-place mask operations
-├── 92. Memory-efficient tensor restriding
+├── 92. Contiguous vs. non-contiguous tensor layouts
 │
 ▼
 ADVANCED ATTENTION VARIANTS
