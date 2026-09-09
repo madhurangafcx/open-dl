@@ -100,7 +100,7 @@ Where `A_{i, j}` is the normalized attention weight assigned by query `i` to key
 
 ---
 
-### 4. Context Output Representation
+### 4. Attention Value Aggregation
 The final output for each token is a convex linear combination of all Value vectors weighted by the attention distribution:
 
 ```math
@@ -110,7 +110,7 @@ The final output for each token is a convex linear combination of all Value vect
 For token `i`:
 
 ```math
-\mathrm{context}_i = \sum_{j=1}^{T} A_{i, j} v_j \in \mathbb{R}^{1 \times d_v}
+\mathrm{head\_output}_i = \sum_{j=1}^{T} A_{i, j} v_j \in \mathbb{R}^{1 \times d_v}
 ```
 
 ---
@@ -223,10 +223,10 @@ NEURAL SOFT ATTENTION LOOKUP (Continuous, Differentiable):
    Database Values:  [ Vector v₁,  Vector v₂,  Vector v₃ ]  (Content carried by tokens)
    Input Query:      Vector q₁                              (What token 1 is searching for)
    
-   Relevance Scores: Dot products:  q₁ · k₁ = 0.1,   q₁ · k₂ = 4.2,   q₁ · k₃ = 0.8
-   Softmax Weights:  Probabilities: A₁,₁ = 0.02,     A₁,₂ = 0.95,     A₁,₃ = 0.03
+   Relevance Scores: Dot products:  q₁ · k₁ = 0.1,    q₁ · k₂ = 4.2,    q₁ · k₃ = 0.8
+   Softmax Weights:  Probabilities: A₁,₁ ≈ 0.016,    A₁,₂ ≈ 0.952,     A₁,₃ ≈ 0.032
    
-   Retrieved Output: Context = 0.02 · v₁  +  0.95 · v₂  +  0.03 · v₃
+   Retrieved Output: Context ≈ 0.016 · v₁  +  0.952 · v₂  +  0.032 · v₃
                      (A soft, differentiable blend dominated by the most relevant Value!)
 ====================================================================================================
 ```
@@ -573,7 +573,8 @@ Let:
 | `V` | `(B, h, T, d_v)` | `V \in \mathbb{R}^{B \times h \times T \times d_v}` | Multi-head value tensor |
 | `scores` | `(B, h, T, T)` | `S \in \mathbb{R}^{B \times h \times T \times T}` | Scaled pairwise similarity scores `Q K^T / \sqrt{d_k}` |
 | `attn_weights` | `(B, h, T, T)` | `A \in [0, 1]^{B \times h \times T \times T}` | Softmax attention distribution summing to 1 across rows |
-| `context` | `(B, T, d_{\mathrm{model}})` | `C \in \mathbb{R}^{B \times T \times d_{\mathrm{model}}}` | Multi-head attention output after `W^O` projection |
+| `head_outputs` | `(B, h, T, d_v)` | `H \in \mathbb{R}^{B \times h \times T \times d_v}` | Per-head weighted Value representations |
+| `mha_output` | `(B, T, d_{\mathrm{model}})` | `M \in \mathbb{R}^{B \times T \times d_{\mathrm{model}}}` | Concatenated head representations after `W^O` projection |
 
 ---
 
@@ -749,14 +750,14 @@ BACKPROPAGATION CALCULUS FOR ATTENTION
 NUMERICAL GRADIENT VERIFICATION
 │
 ├── 80. Finite-difference gradient checking script
-├── 81. Verifying dW_Q, dW_K, dW_V, dW_O (< 1e-7 relative error)
+├── 81. Verifying dW_Q, dW_K, dW_V, dW_O against finite differences with a strict numerical tolerance
 ├── 82. Verifying input gradient dX
 ├── 83. Causal mask gradient routing (Zero gradient to masked entries)
 │
 ▼
 ATTENTION HEATMAP VISUALIZATION
 │
-├── 84. Plotting (T, T) attention matrices with Matplotlib / Seaborn
+├── 84. Plotting (T, T) attention matrices with Matplotlib
 ├── 85. Analyzing diagonal self-attention patterns when present
 ├── 86. Visualizing syntactic dependencies (Adjective -> Noun)
 ├── 87. Analyzing cross-head diversity
@@ -785,7 +786,7 @@ PYTORCH PARITY & VALIDATION
 ├── 98. torch.nn.MultiheadAttention implementation
 ├── 99. Exact numerical agreement down to 7 decimal places
 ├── 100. Benchmarking throughput: NumPy vs PyTorch CUDA
-└── 101. Final reflections: Why Attention conquered Modern AI
+└── 101. Final reflections: Why attention became a foundational mechanism in modern AI
 ```
 
 ---
