@@ -8,7 +8,7 @@ While Project `12-attention` isolated the Multi-Head Attention mechanism in a si
 
 ```text
 ========================================================================================================================
-THE CANONICAL TRANSFORMER ARCHITECTURE (Vaswani et al., 2017)
+ORIGINAL ENCODER-DECODER TRANSFORMER ARCHITECTURE (Vaswani et al., 2017)
 ========================================================================================================================
 
                   OUTPUT PROBABILITIES
@@ -216,7 +216,7 @@ PILLAR 2: RESIDUAL CONNECTIONS (Unbroken Gradient Highways)
    * The identity path x + F(x) creates a direct pathway for gradients to flow backward
      all the way to the input embeddings, substantially improving gradient propagation.
 
-PILLAR 3: POSITION-WISE FEED-FORWARD NETWORKS (Semantic Non-linear Memory)
+PILLAR 3: POSITION-WISE FEED-FORWARD NETWORKS (Nonlinear Feature Transformation)
    * Self-attention primarily performs content-dependent information routing and feature mixing
      through learned projections and attention weights.
    * The FFN provides the main position-wise nonlinear transformation within the Transformer block,
@@ -333,7 +333,8 @@ Let:
 - `T_{\mathrm{tgt}}`: Target sequence length (e.g., `4`).
 - `d_{\mathrm{model}}`: Model representation dimension (e.g., `16`).
 - `h`: Number of attention heads (e.g., `2`).
-- `d_k, d_v`: Head dimension (e.g., `8`). For the original Transformer configuration used here, `d_k = d_v = d_{\mathrm{model}} / h`.
+- `d_k`: Query and Key dimension per head (`d_k = d_{\mathrm{model}} / h = 8`).
+- `d_v`: Value dimension per head (`d_v = d_{\mathrm{model}} / h = 8`).
 - `d_{ff}`: Feed-forward hidden dimension (e.g., `64`).
 - `V_{\mathrm{src}}`: Source vocabulary size (e.g., `20`).
 - `V_{\mathrm{tgt}}`: Target vocabulary size (e.g., `20`).
@@ -411,8 +412,8 @@ INPUT EMBEDDINGS & SCALING
 │
 ├── 07. Source vocabulary vs Target vocabulary (Separate or shared)
 ├── 08. Embedding lookup: Indexing into E in R^(V x d_model)
-├── 09. Embedding scaling formula: X_embed = E[w] * sqrt(d_model)
-├── 10. Why embedding vectors are scaled by sqrt(d_model)
+├── 09. Mathematical formula: Scaling embeddings by sqrt(d_model)
+├── 10. Conceptual motivation: Balancing embedding magnitude with positional encodings
 ├── 11. Weight tying concept: Sharing embedding and output linear head
 │
 ▼
@@ -429,7 +430,7 @@ SINUSOIDAL POSITIONAL ENCODINGS
 ▼
 LAYER NORMALIZATION DEEP DIVE
 │
-├── 19. Why Batch Normalization fails for sequential NLP
+├── 19. Batch Normalization vs Layer Normalization for sequence models
 ├── 20. Layer Normalization (Ba et al., 2016) formulation
 ├── 21. Calculating mean mu across d_model
 ├── 22. Calculating variance sigma^2 across d_model
