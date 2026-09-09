@@ -4,7 +4,7 @@
 
 Understand the **Attention Mechanism** and **Multi-Head Attention (MHA)** from first principles with pure NumPy, and master the foundational mathematical engine that powers modern Transformers, Large Language Models (LLMs), Vision Transformers (ViTs), and multimodal AI systems.
 
-While a Recurrent Neural Network (RNN, `07-rnn-from-scratch`, `09-lstm`, `10-gru`) compresses an entire sequence into a single recurrent hidden state vector `h_t` via sequential recurrence:
+While a Recurrent Neural Network (RNN, `07-rnn-from-scratch`, `09-lstm`, `10-gru`) summarizes past sequence history up to timestep `t` in a recurrent hidden state vector `h_t` via sequential recurrence:
 
 ```math
 h_t = f(x_t, h_{t-1})
@@ -224,9 +224,9 @@ NEURAL SOFT ATTENTION LOOKUP (Continuous, Differentiable):
    Input Query:      Vector q₁                              (What token 1 is searching for)
    
    Relevance Scores: Dot products:  q₁ · k₁ = 0.1,   q₁ · k₂ = 4.2,   q₁ · k₃ = 0.8
-   Softmax Weights:  Probabilities: A₁,₁ = 0.02,     A₁,₂ = 0.94,     A₁,₃ = 0.04
+   Softmax Weights:  Probabilities: A₁,₁ = 0.02,     A₁,₂ = 0.95,     A₁,₃ = 0.03
    
-   Retrieved Output: Context = 0.02 · v₁  +  0.94 · v₂  +  0.04 · v₃
+   Retrieved Output: Context = 0.02 · v₁  +  0.95 · v₂  +  0.03 · v₃
                      (A soft, differentiable blend dominated by the most relevant Value!)
 ====================================================================================================
 ```
@@ -308,7 +308,7 @@ As representation dimension `d_k` grows large (e.g., `d_k = 64` or `d_k = 128`):
 - The variance of the dot products grows proportionally to `d_k`, meaning standard deviations scale as `\sqrt{64} = 8` or `\sqrt{128} \approx 11.3`.
 - When extremely large numbers enter the Softmax function `\operatorname{softmax}(z)`:
   ```math
-  \operatorname{softmax}([+12.0, -11.0, -9.0]) \approx [0.99999, 0.00000, 0.00000]
+  \operatorname{softmax}([+8.0, +2.0, -1.0]) \approx [0.9974, 0.0025, 0.0001]
   ```
 - The distribution collapses toward a saturated one-hot distribution.
 - **The Jacobian of Softmax** is:
@@ -471,7 +471,7 @@ In pure self-attention without positional encodings:
   ```math
   \mathrm{Attention}(P X) = P \mathrm{Attention}(X)
   ```
-- The pure self-attention mechanism has no positional information and therefore cannot distinguish sequences that differ only by token order.
+- Pure self-attention is strictly permutation-equivariant: for any permutation matrix `P`, `\mathrm{Attention}(P X) = P \mathrm{Attention}(X)`. Permuting the input tokens simply permutes the resulting output tokens by the identical permutation without altering pairwise attention weights or feature interactions. Without positional encodings, the mechanism cannot incorporate token positions or sequential order into its computations.
 
 ---
 
@@ -535,11 +535,11 @@ THE 3 ATTENTION FLAVORS IN THE TRANSFORMER (Vaswani et al. Architecture)
    * Mask:         Causal Lower-Triangular Mask (Prevents attending to future words)
 
 3. CROSS-ATTENTION (ENCODER-DECODER ATTENTION):
-   * Query source: Previous Decoder Layer
+   * Query source: Decoder Masked Self-Attention Output (after Add & Norm)
    * Key source:   Final Encoder Output
    * Value source: Final Encoder Output
    * Mask:         None / Source Padding Mask
-   (Queries come from the decoder; Keys and Values are representations projected from the encoder output)
+   (Queries come from the decoder's masked self-attention representations; Keys and Values are representations projected from the final encoder output)
 ====================================================================================================
 ```
 
