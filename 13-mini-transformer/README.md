@@ -208,7 +208,7 @@ THE THREE ARCHITECTURAL PILLARS OF THE TRANSFORMER
 PILLAR 1: LAYER NORMALIZATION (Sample-Independent Stability)
    * LayerNorm is particularly well suited to Transformer architectures because it normalizes
      each token independently across its feature dimensions and does not depend on batch statistics.
-   * Each word vector is zero-centered (mean=0) and scaled (variance=1) individually.
+   * Each word vector is normalized to approximately zero mean and unit variance.
    * Completely independent of batch size B!
 
 PILLAR 2: RESIDUAL CONNECTIONS (Unbroken Gradient Highways)
@@ -260,14 +260,15 @@ The Transformer operates as an asymmetric sequence-to-sequence machine:
 ========================================================================================================================
 ENCODER STACK (Context Extractor)                DECODER STACK (Autoregressive Generator)
 ========================================================================================================================
-Role: Read and understand source text            Role: Generate target text one word at a time
+Role: Read and understand source text            Role: Generate target text autoregressively during inference
 Attention: Bidirectional Self-Attention          Attention: 1. Causal Masked Self-Attention
                                                             2. Cross-Attention (Attends to Encoder)
 Visibility: Every word sees all other words       Visibility: At decoder position t, the model can attend
                                                               only to decoder-input tokens at positions <= t,
                                                               while predicting the next target token
 Input: Source sequence ("I love you very much")  Input: Shifted Target sequence ("<SOS> Ti amo molto")
-Output: Rich context vectors (Keys & Values)     Output: Next-token logits over vocabulary
+Output: Contextual representations used to        Output: Next-token logits over vocabulary
+        construct Keys and Values
 ========================================================================================================================
 ```
 
@@ -275,7 +276,7 @@ Output: Rich context vectors (Keys & Values)     Output: Next-token logits over 
 
 ### How Cross-Attention Bridges Encoder and Decoder
 
-Cross-Attention is the mathematical bridge that allows the target language to look up words in the source language:
+Cross-Attention is the mathematical bridge that allows the target language to retrieve contextual information from the encoded source sequence:
 
 ```math
 \mathrm{CrossAttention} = \operatorname{softmax}\left(\frac{Q_{\mathrm{dec}} K_{\mathrm{enc}}^T}{\sqrt{d_k}}\right) V_{\mathrm{enc}}
@@ -332,7 +333,7 @@ Let:
 - `T_{\mathrm{tgt}}`: Target sequence length (e.g., `4`).
 - `d_{\mathrm{model}}`: Model representation dimension (e.g., `16`).
 - `h`: Number of attention heads (e.g., `2`).
-- `d_k = d_v = d_{\mathrm{model}} / h`: Head dimension (e.g., `8`). For the original Transformer configuration used here, `d_k = d_v = d_{\mathrm{model}} / h`.
+- `d_k, d_v`: Head dimension (e.g., `8`). For the original Transformer configuration used here, `d_k = d_v = d_{\mathrm{model}} / h`.
 - `d_{ff}`: Feed-forward hidden dimension (e.g., `64`).
 - `V_{\mathrm{src}}`: Source vocabulary size (e.g., `20`).
 - `V_{\mathrm{tgt}}`: Target vocabulary size (e.g., `20`).
@@ -410,8 +411,8 @@ INPUT EMBEDDINGS & SCALING
 │
 ├── 07. Source vocabulary vs Target vocabulary (Separate or shared)
 ├── 08. Embedding lookup: Indexing into E in R^(V x d_model)
-├── 09. Why multiply embeddings by sqrt(d_model)?
-├── 10. Preserving variance parity with positional encodings
+├── 09. Embedding scaling formula: X_embed = E[w] * sqrt(d_model)
+├── 10. Why embedding vectors are scaled by sqrt(d_model)
 ├── 11. Weight tying concept: Sharing embedding and output linear head
 │
 ▼
@@ -514,7 +515,7 @@ LOSS FUNCTION & TRAINING DYNAMICS
 ├── 70. Target sequence alignment: y_t = w_{t+1}^*
 ├── 71. Cross-entropy loss across all sequence positions
 ├── 72. Masking the loss at <PAD> positions
-├── 73. Teacher Forcing in parallel: All positions trained in 1 time step
+├── 73. Teacher Forcing in parallel: All target positions trained in one forward pass
 ├── 74. Label smoothing regularization (Vaswani et al. Section 5.4)
 ├── 75. Warmup learning rate schedule: lrate = d_model^(-0.5) * min(step^(-0.5), step * warmup^(-1.5))
 │
