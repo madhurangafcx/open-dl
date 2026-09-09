@@ -85,7 +85,7 @@ The Transformer processes inputs through a pipeline of seven fundamental mathema
 
 ### 1. Scaled Input & Output Embeddings
 Discrete token IDs are looked up in learnable embedding tables `E_{\mathrm{src}} \in \mathbb{R}^{V_{\mathrm{src}} \times d_{\mathrm{model}}}` and `E_{\mathrm{tgt}} \in \mathbb{R}^{V_{\mathrm{tgt}} \times d_{\mathrm{model}}}`.
-As specified in Vaswani et al. (Section 3.4), embedding vectors are scaled by `\sqrt{d_{\mathrm{model}}}` so that their variance matches the unit-variance scale of the positional encodings:
+As specified in Vaswani et al. (Section 3.4), embedding vectors are scaled by `\sqrt{d_{\mathrm{model}}}` to keep their magnitude appropriately balanced with the positional encodings:
 
 ```math
 X_{\mathrm{embed}} = E[w] \cdot \sqrt{d_{\mathrm{model}}} \in \mathbb{R}^{B \times T \times d_{\mathrm{model}}}
@@ -94,7 +94,7 @@ X_{\mathrm{embed}} = E[w] \cdot \sqrt{d_{\mathrm{model}}} \in \mathbb{R}^{B \tim
 ---
 
 ### 2. Sinusoidal Positional Encoding
-Because self-attention is entirely permutation-invariant (order-blind), fixed deterministic positional encodings are added directly to the embeddings:
+Without positional information, self-attention does not inherently encode the order of tokens; permuting the input sequence correspondingly permutes the output representations. Therefore, fixed deterministic positional encodings are added directly to the embeddings:
 
 ```math
 X_0 = X_{\mathrm{embed}} + PE \in \mathbb{R}^{B \times T \times d_{\mathrm{model}}}
@@ -175,7 +175,7 @@ Every sub-layer is wrapped in a residual connection followed by layer normalizat
 x_{\mathrm{sub\_out}} = \mathrm{LayerNorm}\left(x + \mathrm{SubLayer}(x)\right)
 ```
 
-The residual addition `x + \mathrm{SubLayer}(x)` guarantees that identity error signals propagate through the computational graph without vanishing:
+The residual addition creates a direct identity pathway for gradients, which substantially improves gradient propagation through deep networks:
 
 ```math
 \frac{\partial (x + \mathrm{SubLayer}(x))}{\partial x} = \mathbf{I} + \frac{\partial \mathrm{SubLayer}(x)}{\partial x}
@@ -206,21 +206,25 @@ THE THREE ARCHITECTURAL PILLARS OF THE TRANSFORMER
 ========================================================================================================================
 
 PILLAR 1: LAYER NORMALIZATION (Sample-Independent Stability)
-   * BatchNorm fails in NLP because sentence lengths vary dynamically across batches.
-   * LayerNorm normalizes ACROSS FEATURES for each token independently:
-     Each word vector is zero-centered (mean=0) and scaled (variance=1) individually.
+   * LayerNorm is particularly well suited to Transformer architectures because it normalizes
+     each token independently across its feature dimensions and does not depend on batch statistics.
+   * Each word vector is zero-centered (mean=0) and scaled (variance=1) individually.
    * Completely independent of batch size B!
 
 PILLAR 2: RESIDUAL CONNECTIONS (Unbroken Gradient Highways)
-   * Without residual connections, deep stacks of attention layers (N=6, 12, 24) cannot train.
-   * The identity path x + F(x) creates a direct superhighway for gradients to flow backward
-     all the way to the input embeddings without attenuation.
+   * Without residual connections, deep stacks of attention layers (N=6, 12, 24) struggle to train.
+   * The identity path x + F(x) creates a direct pathway for gradients to flow backward
+     all the way to the input embeddings, substantially improving gradient propagation.
 
 PILLAR 3: POSITION-WISE FEED-FORWARD NETWORKS (Semantic Non-linear Memory)
-   * Self-attention is purely a ROUTING and MIXING operation (it creates convex combinations of existing vectors).
-   * Self-attention cannot synthesize new non-linear features by itself!
-   * The FFN acts as a per-token associative memory: it expands features into a higher dimension (4 * d_model),
-     applies non-linear activation (ReLU / GELU), and projects back into representation space.
+   * Self-attention primarily performs content-dependent information routing and feature mixing
+     through learned projections and attention weights.
+   * The FFN provides the main position-wise nonlinear transformation within the Transformer block,
+     complementing the content-dependent mixing performed by self-attention.
+   * The FFN performs a shared position-wise nonlinear transformation on each token representation:
+     it expands features into a higher dimension (4 * d_model), applies a non-linear activation
+     (ReLU or GELU), and projects back into representation space. It can also be interpreted as
+     storing and retrieving feature associations in the learned weights.
 ========================================================================================================================
 ```
 
@@ -243,7 +247,7 @@ PILLAR 3: POSITION-WISE FEED-FORWARD NETWORKS (Semantic Non-linear Memory)
                 └── Mean & Var computed ACROSS BATCH!
 ```
 
-- **Batch Normalization**: Computes statistics vertically down the batch column. Fails when batch size `B` is small (e.g. `B = 1` or `B = 2`), and fails when sentences have varying sequence lengths and padding tokens.
+- **Batch Normalization**: Computes statistics vertically down the batch column. Batch Normalization relies on statistics computed from the batch, which can become noisy or poorly estimated for very small batch sizes, and requires careful handling for variable sequence lengths.
 - **Layer Normalization**: Computes statistics horizontally across the feature dimensions `d_{\mathrm{model}}` for a single token. Behavior is identical during training and inference, with zero dependence on batch size.
 
 ---
@@ -259,7 +263,9 @@ ENCODER STACK (Context Extractor)                DECODER STACK (Autoregressive G
 Role: Read and understand source text            Role: Generate target text one word at a time
 Attention: Bidirectional Self-Attention          Attention: 1. Causal Masked Self-Attention
                                                             2. Cross-Attention (Attends to Encoder)
-Visibility: Every word sees all other words       Visibility: Can only see past and current target words
+Visibility: Every word sees all other words       Visibility: At decoder position t, the model can attend
+                                                              only to decoder-input tokens at positions <= t,
+                                                              while predicting the next target token
 Input: Source sequence ("I love you very much")  Input: Shifted Target sequence ("<SOS> Ti amo molto")
 Output: Rich context vectors (Keys & Values)     Output: Next-token logits over vocabulary
 ========================================================================================================================
@@ -283,28 +289,28 @@ Decoder Query (Q):    "Ti" (Italian word being generated)
 Encoder Keys (K):     [ "I",   "love",   "you",   "very",   "much" ]
 Encoder Values (V):   [ v("I"), v("love"), v("you"), v("very"), v("much") ]
                                │
-Retrieved Context:    0.85 · v("you") + 0.10 · v("I") + 0.05 · v("love")
-                      (The decoder dynamically retrieves the exact source word it needs to translate!)
+Example weighted context representation:    0.85 · v("you") + 0.10 · v("I") + 0.05 · v("love")
+                                            (The decoder dynamically retrieves a context representation from the encoded source sequence.)
 ```
 
 ---
 
-## Training Mode vs. Inference Mode: "It All Happens in One Time Step!"
+## Training Mode vs. Inference Mode: Parallel Training vs. Autoregressive Generation
 
 As highlighted in Umar Jamil's notes (Slide 28), the training of a Transformer differs profoundly from an RNN:
 
 ```text
 ========================================================================================================================
-TRAINING MODE: PARALLEL EXECUTION (Teacher Forcing via Causal Mask)
+TRAINING MODE: PARALLEL TARGET PROCESSING (Teacher Forcing via Causal Mask)
 ========================================================================================================================
 Source:           "<SOS> I love you very much <EOS>"
 Target (Input):   "<SOS> Ti amo molto"
 Target (Label):   "Ti amo molto <EOS>"
 
-Time Step = 1 (It all happens in ONE time step!):
-- The entire target sentence is fed into the decoder simultaneously!
-- The causal mask prevents position 1 ("<SOS>") from looking at position 2 ("Ti").
-- The model computes predictions for ALL 4 target positions in parallel!
+Training iteration: Parallel target processing:
+- The entire shifted target sequence is fed into the decoder simultaneously in one forward pass.
+- The causal mask prevents earlier positions from attending to subsequent tokens.
+- The model computes predictions for all target positions in parallel.
 - Total cross-entropy loss is evaluated across all positions in a single backward pass.
 ========================================================================================================================
 INFERENCE MODE: AUTOREGRESSIVE GENERATION (Step-by-Step Free Running)
@@ -326,10 +332,13 @@ Let:
 - `T_{\mathrm{tgt}}`: Target sequence length (e.g., `4`).
 - `d_{\mathrm{model}}`: Model representation dimension (e.g., `16`).
 - `h`: Number of attention heads (e.g., `2`).
-- `d_k = d_v = d_{\mathrm{model}} / h`: Head dimension (e.g., `8`).
+- `d_k = d_v = d_{\mathrm{model}} / h`: Head dimension (e.g., `8`). For the original Transformer configuration used here, `d_k = d_v = d_{\mathrm{model}} / h`.
 - `d_{ff}`: Feed-forward hidden dimension (e.g., `64`).
 - `V_{\mathrm{src}}`: Source vocabulary size (e.g., `20`).
 - `V_{\mathrm{tgt}}`: Target vocabulary size (e.g., `20`).
+
+> [!NOTE]
+> The parameter count below uses separate source embeddings, target embeddings, and output projection weights for implementation clarity. The original Transformer paper used shared embedding/output weights.
 
 | Component | Tensor / Parameter | Shape | Parameter Formula | Count (`d=16, d_{ff}=64, V=20`) |
 | :--- | :--- | :--- | :--- | :--- |
@@ -346,7 +355,7 @@ Let:
 | **Decoder FFN** | `W_3, b_3, W_4, b_4` | `(d, d_{ff}), (d_{ff}, d)` | `2 \cdot d \cdot d_{ff} + d_{ff} + d` | `2(1024) + 64 + 16 = 2,128` |
 | **Decoder LayerNorm 3**| `\gamma_5, \beta_5` | `(1, d_{\mathrm{model}})` | `2 \times d_{\mathrm{model}}` | `2 \times 16 = 32` |
 | **Output Head** | `W_{\mathrm{vocab}}, b_{\mathrm{vocab}}` | `(d_{\mathrm{model}}, V_{\mathrm{tgt}})` | `d_{\mathrm{model}} \times V_{\mathrm{tgt}} + V_{\mathrm{tgt}}` | `16 \times 20 + 20 = 340` |
-| **TOTAL** | — | — | — | **8,468 learnable parameters** |
+| **TOTAL** | — | — | — | **8,468 learnable parameters for this Mini Transformer configuration** |
 
 ---
 
@@ -408,7 +417,7 @@ INPUT EMBEDDINGS & SCALING
 ▼
 SINUSOIDAL POSITIONAL ENCODINGS
 │
-├── 12. Why Transformers are permutation-invariant
+├── 12. Permutation equivariance of pure self-attention and why positional encodings are required
 ├── 13. The geometric necessity of token order
 ├── 14. Sinusoidal wave equations for even and odd dimensions
 ├── 15. The 10,000^(2i/d_model) frequency wavelength denominator
@@ -520,7 +529,7 @@ AUTOREGRESSIVE INFERENCE & GENERATION
 ├── 81. Stopping criterion: Encountering <EOS> or reaching max_len
 ├── 82. Greedy decoding (Argmax)
 ├── 83. Beam Search decoding (Maintaining top B hypotheses)
-├── 84. Key-Value (KV) Caching concept preview (Avoiding redundant O(T^2) re-computation)
+├── 84. Key-Value (KV) Caching concept preview (Avoiding redundant recomputation: reducing cumulative autoregressive self-attention from roughly O(T^3) toward O(T^2))
 │
 ▼
 FULL-SYSTEM BACKPROPAGATION CALCULUS

@@ -439,7 +439,9 @@ X \in \mathbb{R}^{B \times T \times d_{\mathrm{model}}}
 
 ## The Positional Problem & Positional Encoding
 
-### Pure Self-Attention is Permutation Invariant!
+### Pure Self-Attention is Permutation Equivariant (Order-Agnostic)
+
+Without positional information, self-attention does not inherently encode the order of tokens; permuting the input sequence correspondingly permutes the output representations.
 
 Consider two sequences with identical words in completely different orders:
 ```text
@@ -447,13 +449,13 @@ Sequence A: "The dog bit the man"
 Sequence B: "The man bit the dog"
 ```
 
-In pure self-attention without positional information:
-- The dot product between word vectors `x_i \cdot x_j` depends **only on their feature values**, not their position index!
-- Permuting the input rows permutes the output rows identically:
+In pure self-attention without positional encodings:
+- The dot product between word vectors `x_i \cdot x_j` depends **only on their feature values**, not their sequence position index.
+- Permuting the input rows permutes the output rows identically (permutation equivariance):
   ```math
   \mathrm{Attention}(P X) = P \mathrm{Attention}(X)
   ```
-- **The model has zero knowledge of word order!**
+- **The model has zero knowledge of sequential token order!**
 
 ---
 
@@ -608,7 +610,7 @@ THE ATTENTION REVOLUTION
 ├── 03. O(T) sequential operations vs O(1) parallel operations
 ├── 04. Maximum path length: O(T) vs O(1) direct shortcuts
 ├── 05. The Vaswani et al. (2017) breakthrough
-├── 06. Permutation invariance of pure attention
+├── 06. Permutation equivariance of pure self-attention (order-agnostic)
 │
 ▼
 THE QUERY, KEY, VALUE PARADIGM
