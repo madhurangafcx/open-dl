@@ -194,12 +194,12 @@ Token 1 ("The") ................................................. Token T ("was"
 
 | Layer Type | Complexity per Layer | Sequential Operations | Maximum Path Length | Memory Footprint |
 | :--- | :--- | :--- | :--- | :--- |
-| **Self-Attention** | `O(T^2 \cdot d)` | **`O(1)`** (Embarrassingly Parallel) | **`O(1)`** (Direct Shortcut) | `O(T^2 + T \cdot d)` |
+| **Self-Attention** | `O(T \cdot d^2 + T^2 \cdot d)` | **`O(1)`** (Embarrassingly Parallel) | **`O(1)`** (Direct Shortcut) | `O(T^2 + T \cdot d)` |
 | **Recurrent (RNN/LSTM)** | `O(T \cdot d^2)` | **`O(T)`** (Strictly Sequential) | **`O(T)`** (Information Decay) | `O(T \cdot d)` |
 | **Convolutional (1D CNN)** | `O(k \cdot T \cdot d^2)` | **`O(1)`** (Parallel receptive fields) | **`O(\log_k(T))`** (Tree height) | `O(T \cdot d)` |
 
 > [!IMPORTANT]
-> Computational complexity is fundamentally distinct from sequential dependency depth. When `T` is not too large relative to `d` (e.g., standard sentence lengths where `T \cdot d < d^2`), self-attention can be competitive with or more efficient than recurrent layers, while offering much greater parallelism due to `O(1)` sequential operations.
+> Computational complexity is fundamentally distinct from sequential dependency depth. When sequence lengths are not large relative to the model dimension, self-attention can be competitive with recurrent layers while offering substantially greater parallelism due to `O(1)` sequential operations.
 
 ---
 
@@ -525,7 +525,8 @@ THE 3 ATTENTION FLAVORS IN THE TRANSFORMER (Vaswani et al. Architecture)
    * Query source: Encoder Layer Input
    * Key source:   Encoder Layer Input
    * Value source: Encoder Layer Input
-   * Mask:         None (Bidirectional: every word sees every other word)
+   * Mask:         None for causal masking; optionally a source-padding mask
+                   (bidirectional over non-padding tokens)
 
 2. MASKED DECODER SELF-ATTENTION:
    * Query source: Decoder Layer Input
@@ -534,10 +535,11 @@ THE 3 ATTENTION FLAVORS IN THE TRANSFORMER (Vaswani et al. Architecture)
    * Mask:         Causal Lower-Triangular Mask (Prevents attending to future words)
 
 3. CROSS-ATTENTION (ENCODER-DECODER ATTENTION):
-   * Query source: Previous Decoder Layer (What target word needs to be translated)
-   * Key source:   Final Encoder Output   (Source language context tags)
-   * Value source: Final Encoder Output   (Source language content)
+   * Query source: Previous Decoder Layer
+   * Key source:   Final Encoder Output
+   * Value source: Final Encoder Output
    * Mask:         None / Source Padding Mask
+   (Queries come from the decoder; Keys and Values are representations projected from the encoder output)
 ====================================================================================================
 ```
 
