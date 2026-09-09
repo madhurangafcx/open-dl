@@ -62,7 +62,7 @@ MaxPool2D (Window: 2 × 2, Stride: 1)
 ├── src/
 │   └── cnn.py                    # Pure NumPy 2D convolution and forward pipeline
 └── steps/
-    └── step-01-mathematics.md    # Complete mathematical foundations (Q1–Q11)
+    └── step-01-mathematics.md    # Complete mathematical foundations (Q1–Q12)
 ```
 
 ## Learning workflow
@@ -71,7 +71,7 @@ Every project in this repository adheres to the standard 10-step sequence:
 
 | Step | Status | Evidence |
 | :--- | :--- | :--- |
-| 1. Mathematics | Complete | `steps/step-01-mathematics.md` (Q1–Q11: discrete cross-correlation, spatial geometry, 9-patch manual calculations, receptive field, pooling, and full backpropagation calculus) |
+| 1. Mathematics | Complete | `steps/step-01-mathematics.md` (Q1–Q12: discrete cross-correlation, spatial geometry, 9-patch manual calculations, 25-patch padded calculations, receptive field, pooling suite, full backpropagation calculus, and complete cnn.py mapping) |
 | 2. NumPy implementation | In Progress | `src/cnn.py`: `conv2d` with universal stride support (`int`, `tuple`, `np.ndarray`), pre-allocated outputs, and sliding receptive fields |
 | 3. Understand forward pass | Complete | Verified exact feature map values matching manual derivation for all 9 cells |
 | 4. Understand loss | In Progress | Multi-class categorical cross-entropy loss with numerical clipping |
@@ -159,23 +159,37 @@ Running `src/cnn.py` verifies the exact numerical calculations detailed in `step
  [0. 1. 2.]]
 ```
 
-### Convolved Feature Map (3 × 3):
+### Convolved Feature Map with padding=0 (3 × 3):
 ```text
 [[12. 12. 17.]
  [10. 17. 19.]
  [ 9.  6. 14.]]
 ```
 
-Every single cell has been verified by manual arithmetic:
-- `feature_map[0, 0] = sum([[3,3,2],[0,0,1],[3,1,2]] * kernel) + 0.0 = 12.0`
-- `feature_map[0, 1] = sum([[3,2,1],[0,1,3],[1,2,2]] * kernel) + 0.0 = 12.0`
-- `feature_map[0, 2] = sum([[2,1,0],[1,3,1],[2,2,3]] * kernel) + 0.0 = 17.0`
-- `feature_map[1, 0] = sum([[0,0,1],[3,1,2],[2,0,0]] * kernel) + 0.0 = 10.0`
-- `feature_map[1, 1] = sum([[0,1,3],[1,2,2],[0,0,2]] * kernel) + 0.0 = 17.0`
-- `feature_map[1, 2] = sum([[1,3,1],[2,2,3],[0,2,2]] * kernel) + 0.0 = 19.0`
-- `feature_map[2, 0] = sum([[3,1,2],[2,0,0],[2,0,0]] * kernel) + 0.0 =  9.0`
-- `feature_map[2, 1] = sum([[1,2,2],[0,0,2],[0,0,0]] * kernel) + 0.0 =  6.0`
-- `feature_map[2, 2] = sum([[2,2,3],[0,2,2],[0,0,1]] * kernel) + 0.0 = 14.0`
+### Convolved Feature Map with padding=1 (5 × 5):
+```text
+[[ 6. 14. 17. 11.  3.]
+ [14. 12. 12. 17. 11.]
+ [ 8. 10. 17. 19. 13.]
+ [11.  9.  6. 14. 12.]
+ [ 6.  4.  4.  6.  4.]]
+```
+
+### Downsampled Pooling Comparison on 5 × 5 Map (pool_size=2, stride=2):
+
+| Pooling Mode | Output Map (2 × 2) | Arithmetic Operation |
+| :--- | :--- | :--- |
+| **Max Pooling** | `[[14.0, 17.0], [11.0, 19.0]]` | `np.max(window)` (peaks/edges) |
+| **Average Pooling** | `[[11.5, 14.25], [9.5, 14.0]]` | `np.mean(window)` (smooth context) |
+| **Min Pooling** | `[[6.0, 11.0], [8.0, 6.0]]` | `np.min(window)` (darkest/lowest) |
+
+Notice the invariant relationship verified across every window:
+```text
+Min (6.0)  <=  Avg (11.5)  <=  Max (14.0)
+Min (11.0) <=  Avg (14.25) <=  Max (17.0)
+Min (8.0)  <=  Avg (9.5)   <=  Max (11.0)
+Min (6.0)  <=  Avg (14.0)  <=  Max (19.0)
+```
 
 ## Run the project
 
@@ -195,12 +209,12 @@ python3 cnn.py
 
 1. **Cross-correlation vs. True convolution**: Deep learning implements discrete 2D cross-correlation in the forward pass. True mathematical convolution (flipping the kernel 180°) emerges naturally in backpropagation when calculating the error gradient with respect to input activations `dX`.
 2. **Inductive bias**: By enforcing local connectivity and weight tying, CNNs achieve translation equivariance while slashing parameter counts by over 99% compared to dense layers.
-3. **Receptive field stacking**: Two stacked 3 × 3 convolutions cover the exact same 5 × 5 receptive field as a single 5 × 5 convolution, while using 28% fewer parameters (18 vs 25) and introducing two non-linear ReLU activations instead of one.
-4. **Memory pre-allocation**: Allocating `np.zeros((out_h, out_w), dtype=np.float32)` avoids dynamic list appends, memory reallocations, and leverages cache locality.
+3. **Padding preservation**: `padding = 0` (valid) strips `K - 1` spatial pixels; `padding = (K - 1) // 2` (same) adds zero borders to keep spatial resolution constant.
+4. **Pooling mechanics**: `max_pool2d`, `avg_pool2d`, and `min_pool2d` contain zero learnable parameters, downsampling spatial grids while extracting distinct signal characteristics (peaks vs. averages vs. minima).
 
 ## Next steps
 
-1. Add zero-padding modes (`padding='same'` and `padding='valid'`) to `conv2d`.
-2. Extend `conv2d` to multi-channel input tensors `(C_in, H, W)` and multiple filters `(C_out, C_in, K_h, K_w)`.
-3. Implement `max_pool2d`, `relu`, and `flatten` layers in `src/cnn.py`.
-4. Implement backward passes (`conv2d_backward`, `max_pool2d_backward`, `relu_backward`) derived in `steps/step-01-mathematics.md`.
+1. Extend `conv2d` to multi-channel input tensors `(C_in, H, W)` and multiple filters `(C_out, C_in, K_h, K_w)`.
+2. Implement `relu` activation and `flatten` layers in `src/cnn.py`.
+3. Implement backward passes (`conv2d_backward`, `max_pool2d_backward`, `avg_pool2d_backward`, `relu_backward`) derived in `steps/step-01-mathematics.md`.
+

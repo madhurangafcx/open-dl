@@ -465,12 +465,12 @@ Z_{i, j} = \sum_{m=0}^{2} \sum_{n=0}^{2} \left( \mathrm{patch}_{m, n} \cdot K_{m
 
 ---
 
-### Final verified feature map
+### Final verified feature map (padding = 0, unpadded)
 
-Collecting all 9 values yields the exact matrix produced by `src/cnn.py`:
+Collecting all 9 values yields the exact matrix produced by `conv2d_unpadded` (or `conv2d` with `padding=0`) in `src/cnn.py`:
 
 ```text
-Z = np.array([
+Z_unpadded = np.array([
     [12.0, 12.0, 17.0],
     [10.0, 17.0, 19.0],
     [ 9.0,  6.0, 14.0]
@@ -478,10 +478,267 @@ Z = np.array([
 ```
 
 ```text
-Z.shape = (3, 3)
+Z_unpadded.shape = (3, 3)
 ```
 
 ---
+
+### 4. Forward pass with padding = 1 ("Same" padding) — Matching cnn.py
+
+When `padding = 1`, a 1-pixel border of zeros is added around the entire 5 × 5 image.
+
+#### Padded Canvas (7 × 7):
+
+```math
+H_{\mathrm{padded}} = H_{\mathrm{in}} + 2 P = 5 + 2(1) = 7
+```
+
+```math
+W_{\mathrm{padded}} = W_{\mathrm{in}} + 2 P = 5 + 2(1) = 7
+```
+
+```text
+         Col 0  Col 1  Col 2  Col 3  Col 4  Col 5  Col 6
+Row 0  [   0      0      0      0      0      0      0   ]  <- Top zero border
+Row 1  [   0    ( 3      3      2      1      0 )    0   ]  <- Original Row 0
+Row 2  [   0    ( 0      0      1      3      1 )    0   ]  <- Original Row 1
+Row 3  [   0    ( 3      1      2      2      3 )    0   ]  <- Original Row 2
+Row 4  [   0    ( 2      0      0      2      2 )    0   ]  <- Original Row 3
+Row 5  [   0    ( 2      0      0      0      1 )    0   ]  <- Original Row 4
+Row 6  [   0      0      0      0      0      0      0   ]  <- Bottom zero border
+```
+
+#### Output dimensions with padding = 1:
+
+```math
+H_{\mathrm{out}} = \left\lfloor \frac{7 - 3}{1} \right\rfloor + 1 = 5
+```
+
+```math
+W_{\mathrm{out}} = \left\lfloor \frac{7 - 3}{1} \right\rfloor + 1 = 5
+```
+
+The output feature map preserves the exact 5 × 5 spatial dimensions of the original image!
+
+#### The Three Topological Regions of the 5 × 5 Padded Feature Map
+
+When sliding a 3 × 3 kernel over the 7 × 7 zero-padded canvas, the 25 output positions partition into three distinct mathematical regions based on how many zero-padded boundary elements enter the receptive field:
+
+```text
+       Col 0      Col 1      Col 2      Col 3      Col 4
+Row 0 [ Corner ] [  Edge  ] [  Edge  ] [  Edge  ] [ Corner ]
+Row 1 [  Edge  ] [Interior] [Interior] [Interior] [  Edge  ]
+Row 2 [  Edge  ] [Interior] [Interior] [Interior] [  Edge  ]
+Row 3 [  Edge  ] [Interior] [Interior] [Interior] [  Edge  ]
+Row 4 [ Corner ] [  Edge  ] [  Edge  ] [  Edge  ] [ Corner ]
+```
+
+1. **Corner Cells (4 positions: `(0,0)`, `(0,4)`, `(4,0)`, `(4,4)`)**:
+   - The 3 × 3 receptive field overlaps **2 padding borders** simultaneously (e.g. top and left).
+   - Exactly **5 elements** in the receptive field are zeros, and only **4 elements** come from the original image.
+2. **Edge Cells (12 positions)**:
+   - The receptive field overlaps **1 padding border** (top, bottom, left, or right).
+   - Exactly **3 elements** are zeros, and **6 elements** come from the original image.
+3. **Interior Cells (9 positions: rows 1 to 3, cols 1 to 3)**:
+   - The receptive field is completely within the original image boundary (**0 zeros**).
+   - All **9 elements** are original image pixels.
+   - Consequently, this 3 × 3 interior sub-matrix is **identical** to the unpadded convolution result `Z_unpadded`!
+
+---
+
+#### Step-by-Step Arithmetic for Key Representative Cells
+
+#### 1. Top-Left Corner Cell (0, 0) — Overlaps Top & Left Zero Borders
+
+- **Receptive Field Slice**: `padded[0:3, 0:3]`
+  ```text
+  [ 0,  0,  0 ]   <- Top zero border
+  [ 0,  3,  3 ]   <- Left zero border + original pixels (0,0) and (0,1)
+  [ 0,  0,  0 ]   <- Left zero border + original pixels (1,0) and (1,1)
+  ```
+- **Hadamard product with kernel**:
+  ```text
+  (0 × 0) = 0    (0 × 1) = 0    (0 × 2) = 0
+  (0 × 2) = 0    (3 × 2) = 6    (3 × 0) = 0
+  (0 × 0) = 0    (0 × 1) = 0    (0 × 2) = 0
+  ```
+- **Sum & Bias**:
+  ```math
+  Z_{\mathrm{padded}, 0, 0} = 0 + 0 + 0 + 0 + 6 + 0 + 0 + 0 + 0 + 0.0 = 6.0
+  ```
+
+---
+
+#### 2. Top-Right Corner Cell (0, 4) — Overlaps Top & Right Zero Borders
+
+- **Receptive Field Slice**: `padded[0:3, 4:7]`
+  ```text
+  [ 0,  0,  0 ]   <- Top zero border
+  [ 1,  0,  0 ]   <- Original pixels (0,3), (0,4) + Right zero border
+  [ 3,  1,  0 ]   <- Original pixels (1,3), (1,4) + Right zero border
+  ```
+- **Hadamard product with kernel**:
+  ```text
+  (0 × 0) = 0    (0 × 1) = 0    (0 × 2) = 0
+  (1 × 2) = 2    (0 × 2) = 0    (0 × 0) = 0
+  (3 × 0) = 0    (1 × 1) = 1    (0 × 2) = 0
+  ```
+- **Sum & Bias**:
+  ```math
+  Z_{\mathrm{padded}, 0, 4} = 0 + 0 + 0 + 2 + 0 + 0 + 0 + 1 + 0 + 0.0 = 3.0
+  ```
+
+---
+
+#### 3. Top-Middle Edge Cell (0, 2) — Overlaps Top Zero Border Only
+
+- **Receptive Field Slice**: `padded[0:3, 2:5]`
+  ```text
+  [ 0,  0,  0 ]   <- Top zero border
+  [ 3,  2,  1 ]   <- Original row 0, cols 1:4
+  [ 0,  1,  3 ]   <- Original row 1, cols 1:4
+  ```
+- **Hadamard product with kernel**:
+  ```text
+  (0 × 0) = 0    (0 × 1) = 0    (0 × 2) = 0
+  (3 × 2) = 6    (2 × 2) = 4    (1 × 0) = 0
+  (0 × 0) = 0    (1 × 1) = 1    (3 × 2) = 6
+  ```
+- **Sum & Bias**:
+  ```math
+  Z_{\mathrm{padded}, 0, 2} = (0 + 0 + 0) + (6 + 4 + 0) + (0 + 1 + 6) + 0.0 = 17.0
+  ```
+
+---
+
+#### 4. Interior Center Cell (2, 2) — Zero Padding Does Not Enter
+
+- **Receptive Field Slice**: `padded[2:5, 2:5] = image[1:4, 1:4]`
+  ```text
+  [ 0,  1,  3 ]
+  [ 1,  2,  2 ]
+  [ 0,  0,  2 ]
+  ```
+- **Hadamard product with kernel**:
+  ```text
+  (0 × 0) = 0    (1 × 1) = 1    (3 × 2) = 6
+  (1 × 2) = 2    (2 × 2) = 4    (2 × 0) = 0
+  (0 × 0) = 0    (0 × 1) = 0    (2 × 2) = 4
+  ```
+- **Sum & Bias**:
+  ```math
+  Z_{\mathrm{padded}, 2, 2} = (0 + 1 + 6) + (2 + 4 + 0) + (0 + 0 + 4) + 0.0 = 17.0
+  ```
+  *(Notice this is mathematically identical to unpadded cell `(1, 1)`!)*
+
+---
+
+#### 5. Bottom-Right Corner Cell (4, 4) — Overlaps Bottom & Right Zero Borders
+
+- **Receptive Field Slice**: `padded[4:7, 4:7]`
+  ```text
+  [ 2,  2,  0 ]   <- Original pixels (3,3), (3,4) + Right zero border
+  [ 0,  1,  0 ]   <- Original pixels (4,3), (4,4) + Right zero border
+  [ 0,  0,  0 ]   <- Bottom zero border
+  ```
+- **Hadamard product with kernel**:
+  ```text
+  (2 × 0) = 0    (2 × 1) = 2    (0 × 2) = 0
+  (0 × 2) = 0    (1 × 2) = 2    (0 × 0) = 0
+  (0 × 0) = 0    (0 × 1) = 0    (0 × 2) = 0
+  ```
+- **Sum & Bias**:
+  ```math
+  Z_{\mathrm{padded}, 4, 4} = 0 + 2 + 0 + 0 + 2 + 0 + 0 + 0 + 0 + 0.0 = 4.0
+  ```
+
+---
+
+#### Complete 25-Cell Calculation Table (Matching `output_pad1` in `cnn.py`)
+
+| Output Cell `(i, j)` | Region Type | Active Dot-Product Terms `(patch * kernel)` | Sum + Bias | Final Value |
+| :--- | :--- | :--- | :--- | :--- |
+| `(0, 0)` | Corner | `(3*2)` | `6 + 0.0` | **6.0** |
+| `(0, 1)` | Edge | `(3*2) + (3*2) + (1*2)` | `6 + 6 + 2 + 0.0` | **14.0** |
+| `(0, 2)` | Edge | `(3*2) + (2*2) + (1*1) + (3*2)` | `6 + 4 + 1 + 6 + 0.0` | **17.0** |
+| `(0, 3)` | Edge | `(2*2) + (1*2) + (3*1) + (1*2)` | `4 + 2 + 3 + 2 + 0.0` | **11.0** |
+| `(0, 4)` | Corner | `(1*2) + (1*1)` | `2 + 1 + 0.0` | **3.0** |
+| `(1, 0)` | Edge | `(3*1) + (3*2) + (3*1) + (1*2)` | `3 + 6 + 3 + 2 + 0.0` | **14.0** |
+| `(1, 1)` | Interior | `(3*1) + (2*2) + (1*1) + (2*2)` | `3 + 4 + 1 + 4 + 0.0` | **12.0** |
+| `(1, 2)` | Interior | `(2*1) + (1*2) + (1*2) + (2*1) + (2*2)` | `2 + 2 + 2 + 2 + 4 + 0.0` | **12.0** |
+| `(1, 3)` | Interior | `(1*1) + (1*2) + (3*2) + (2*1) + (3*2)` | `1 + 2 + 6 + 2 + 6 + 0.0` | **17.0** |
+| `(1, 4)` | Edge | `(3*2) + (1*2) + (3*1)` | `6 + 2 + 3 + 0.0` | **11.0** |
+| `(2, 0)` | Edge | `(3*2) + (2*1)` | `6 + 2 + 0.0` | **8.0** |
+| `(2, 1)` | Interior | `(1*2) + (3*2) + (1*2)` | `2 + 6 + 2 + 0.0` | **10.0** |
+| `(2, 2)` | Interior | `(1*1) + (3*2) + (1*2) + (2*2) + (2*2)` | `1 + 6 + 2 + 4 + 4 + 0.0` | **17.0** |
+| `(2, 3)` | Interior | `(3*1) + (1*2) + (2*2) + (2*2) + (2*1) + (2*2)` | `3 + 2 + 4 + 4 + 2 + 4 + 0.0` | **19.0** |
+| `(2, 4)` | Edge | `(1*1) + (2*2) + (3*2) + (2*1)` | `1 + 4 + 6 + 2 + 0.0` | **13.0** |
+| `(3, 0)` | Edge | `(3*1) + (1*2) + (2*2) + (2*1)` | `3 + 2 + 4 + 2 + 0.0` | **11.0** |
+| `(3, 1)` | Interior | `(1*1) + (2*2) + (2*2)` | `1 + 4 + 4 + 0.0` | **9.0** |
+| `(3, 2)` | Interior | `(2*1) + (2*2)` | `2 + 4 + 0.0` | **6.0** |
+| `(3, 3)` | Interior | `(2*1) + (3*2) + (2*2) + (1*2)` | `2 + 6 + 4 + 2 + 0.0` | **14.0** |
+| `(3, 4)` | Edge | `(3*1) + (2*2) + (2*2) + (1*1)` | `3 + 4 + 4 + 1 + 0.0` | **12.0** |
+| `(4, 0)` | Corner | `(2*1) + (2*2)` | `2 + 4 + 0.0` | **6.0** |
+| `(4, 1)` | Edge | `(2*2)` | `4 + 0.0` | **4.0** |
+| `(4, 2)` | Edge | `(2*2)` | `4 + 0.0` | **4.0** |
+| `(4, 3)` | Edge | `(2*1) + (2*2)` | `2 + 4 + 0.0` | **6.0** |
+| `(4, 4)` | Corner | `(2*1) + (1*2)` | `2 + 2 + 0.0` | **4.0** |
+
+---
+
+#### Full 5 × 5 convolved feature map (`output_pad1`):
+
+```text
+Z_padded = np.array([
+    [ 6.0, 14.0, 17.0, 11.0,  3.0],
+    [14.0, 12.0, 12.0, 17.0, 11.0],
+    [ 8.0, 10.0, 17.0, 19.0, 13.0],
+    [11.0,  9.0,  6.0, 14.0, 12.0],
+    [ 6.0,  4.0,  4.0,  6.0,  4.0]
+], dtype=np.float32)
+```
+
+#### Interior Preservation Property:
+
+Notice that extracting rows 1:4 and cols 1:4 from `Z_padded` yields the exact unpadded 3 × 3 feature map:
+
+```text
+Z_padded[1:4, 1:4] = np.array([
+    [12.0, 12.0, 17.0],
+    [10.0, 17.0, 19.0],
+    [ 9.0,  6.0, 14.0]
+])
+```
+
+---
+
+#### Boundary Effect Analysis: Why `padding = 0` produces 12.0 while `padding = 1` produces 6.0 at [0, 0]
+
+In `src/cnn.py`, running the script produces:
+- `padding=0 at [0, 0]: 12.0`
+- `padding=1 at [0, 0]: 6.0`
+
+Why does adding zero-padding change the output at coordinate `[0, 0]`?
+
+1. **In Unpadded Convolution (`padding = 0`)**:
+   - The top-left corner of the kernel `K[0, 0]` aligns with image pixel `X[0, 0] = 3`.
+   - The entire 3 × 3 kernel lies on active image data `image[0:3, 0:3]`.
+   - All 9 elements contribute non-zero products, summing to `12.0`.
+
+2. **In Same-Padded Convolution (`padding = 1`)**:
+   - The **center** of the kernel `K[1, 1]` aligns with image pixel `X[0, 0] = 3`.
+   - The top row of the kernel and the left column of the kernel lie outside the image on the zero border.
+   - 5 of the 9 kernel weights multiply `0.0`:
+     ```math
+     0 \cdot K_{0,0} + 0 \cdot K_{0,1} + 0 \cdot K_{0,2} + 0 \cdot K_{1,0} + 0 \cdot K_{2,0} = 0
+     ```
+   - Only 4 kernel weights multiply real image pixels, producing `3 * K[1, 1] = 3 * 2 = 6.0`.
+
+> [!NOTE]
+> Same padding guarantees that every pixel of the original image serves as the **center** of at least one receptive field. However, pixels near the boundary have smaller effective receptive fields (fewer non-zero neighbors), causing natural edge attenuation.
+
+---
+
 
 ## Q5 — Spatial arithmetic: Output dimensions, stride, and padding
 
@@ -593,6 +850,87 @@ else:
         s_h, s_w = int(stride_arr[0]), int(stride_arr[1])
     else:
         raise ValueError("stride must contain 1 or 2 values")
+```
+
+### Numerical walkthrough: Strided unpadded convolution (stride = 2) — Matching cnn.py
+
+In `src/cnn.py` (lines 55–58), the comments explicitly discuss strided convolution:
+```python
+# For a 5x5 image, 3x3 kernel, and stride (2, 2):
+# out_h = (5 - 3) // 2 + 1 = 2 rows
+# out_w = (5 - 3) // 2 + 1 = 2 columns
+```
+
+Let us work through the exact mathematical forward pass for this configuration:
+
+#### Output dimensions calculation:
+
+```math
+H_{\mathrm{out}} = \left\lfloor \frac{5 - 3}{2} \right\rfloor + 1 = \lfloor 1.0 \rfloor + 1 = 2
+```
+
+```math
+W_{\mathrm{out}} = \left\lfloor \frac{5 - 3}{2} \right\rfloor + 1 = \lfloor 1.0 \rfloor + 1 = 2
+```
+
+The feature map shrinks from 3 × 3 (with `stride=1`) down to **2 × 2** (with `stride=2`).
+
+#### Step-by-step arithmetic for all 4 output positions:
+
+1. **Cell (0, 0)**:
+   - Starts at `r = 0 * 2 = 0`, `c = 0 * 2 = 0`
+   - Receptive field: `image[0:3, 0:3]`
+   - Calculation:
+     ```math
+     Z_{0, 0} = (3 \cdot 0 + 3 \cdot 1 + 2 \cdot 2) + (0 \cdot 2 + 0 \cdot 2 + 1 \cdot 0) + (3 \cdot 0 + 1 \cdot 1 + 2 \cdot 2) + 0.0 = 12.0
+     ```
+
+2. **Cell (0, 1)**:
+   - Starts at `r = 0 * 2 = 0`, `c = 1 * 2 = 2`
+   - Receptive field: `image[0:3, 2:5]` (jumps over column 1)
+   - Calculation:
+     ```math
+     Z_{0, 1} = (2 \cdot 0 + 1 \cdot 1 + 0 \cdot 2) + (1 \cdot 2 + 3 \cdot 2 + 1 \cdot 0) + (2 \cdot 0 + 2 \cdot 1 + 3 \cdot 2) + 0.0 = 17.0
+     ```
+
+3. **Cell (1, 0)**:
+   - Starts at `r = 1 * 2 = 2`, `c = 0 * 2 = 0` (jumps over row 1)
+   - Receptive field: `image[2:5, 0:3]`
+   - Calculation:
+     ```math
+     Z_{1, 0} = (3 \cdot 0 + 1 \cdot 1 + 2 \cdot 2) + (2 \cdot 2 + 0 \cdot 2 + 0 \cdot 0) + (2 \cdot 0 + 0 \cdot 1 + 0 \cdot 2) + 0.0 = 9.0
+     ```
+
+4. **Cell (1, 1)**:
+   - Starts at `r = 1 * 2 = 2`, `c = 1 * 2 = 2` (jumps over row 1 and column 1)
+   - Receptive field: `image[2:5, 2:5]`
+   - Calculation:
+     ```math
+     Z_{1, 1} = (2 \cdot 0 + 2 \cdot 1 + 3 \cdot 2) + (0 \cdot 2 + 2 \cdot 2 + 2 \cdot 0) + (0 \cdot 0 + 0 \cdot 1 + 1 \cdot 2) + 0.0 = 14.0
+     ```
+
+#### Resulting 2 × 2 Strided Feature Map:
+
+```text
+Z_strided2 = np.array([
+    [12.0, 17.0],
+    [ 9.0, 14.0]
+], dtype=np.float32)
+```
+
+#### The Subsampling Relationship:
+
+Notice that striding by `S = 2` exactly subsamples the unit-stride unpadded feature map `Z_unpadded` at even row and column indices:
+
+```math
+Z_{\mathrm{stride}=2}[i, j] = Z_{\mathrm{stride}=1}[2i, \, 2j]
+```
+
+```text
+Z_unpadded[0, 0] = 12.0  ──►  Z_strided2[0, 0] = 12.0
+Z_unpadded[0, 2] = 17.0  ──►  Z_strided2[0, 1] = 17.0
+Z_unpadded[2, 0] =  9.0  ──►  Z_strided2[1, 0] =  9.0
+Z_unpadded[2, 2] = 14.0  ──►  Z_strided2[1, 1] = 14.0
 ```
 
 ---
@@ -722,101 +1060,246 @@ because its derivative is exactly `1.0` for all positive inputs.
 
 ---
 
-## Q8 — Pooling and downsampling mathematics (Max Pooling & Average Pooling)
+## Q8 — Pooling and downsampling mathematics (Max Pooling, Average Pooling & Min Pooling)
 
 A pooling layer reduces the spatial dimensions `(H, W)` of feature maps while retaining
-the most dominant visual features.
+the most dominant visual features or contextual summaries.
 
 ### Why pooling is necessary
 1. **Dimension reduction**: Reduces memory consumption and computational cost in downstream
-   layers.
+   layers (e.g. cutting spatial resolution in half reduces dense parameters by 75%).
 2. **Translation invariance**: If a feature activates at `(i, j)` or slightly shifted at
-   `(i+1, j)`, the max pool output over the window remains identical.
-3. **Receptive field enlargement**: Allows deeper layers to view a larger spatial region
-   of the original input image.
+   `(i+1, j)`, the pooled response over the local window remains invariant.
+3. **Receptive field enlargement**: Downsampling allows deeper layers to view a wider spatial
+   region of the original input image without requiring larger filters.
+4. **Zero learnable parameters**: Pooling layers contain **no weights and no biases**
+   (`weights = 0`, `biases = 0`). They execute a fixed, deterministic routing or reduction
+   operation.
 
-### Max Pooling vs. Average Pooling equations
+---
 
-For a pooling window of size `P_h × P_w` and stride `S_pool`:
+### Mathematical definitions of the three pooling operations
+
+For an input activation map `A`, a pooling window of size `P_h × P_w`, and stride `(S_h, S_w)`:
+
+#### 1. Max Pooling (`max_pool2d`)
+Selects the single largest element in each window:
 
 ```math
 \mathrm{MaxPool}(A)_{i, j} = \max_{m=0}^{P_h - 1} \max_{n'=0}^{P_w - 1} A_{i \cdot S_h + m, \, j \cdot S_w + n'}
 ```
 
+- **What it captures**: Peak feature presence (sharp edges, high-contrast textures, foreground signals).
+- **Core question**: *"Did the target feature appear anywhere inside this local window?"*
+
+#### 2. Average Pooling (`avg_pool2d`)
+Calculates the arithmetic mean across all elements in each window:
+
 ```math
 \mathrm{AvgPool}(A)_{i, j} = \frac{1}{P_h \cdot P_w} \sum_{m=0}^{P_h - 1} \sum_{n'=0}^{P_w - 1} A_{i \cdot S_h + m, \, j \cdot S_w + n'}
 ```
 
-> [!NOTE]
-> Pooling layers contain **zero learnable parameters** (`weights = 0`, `biases = 0`).
-> They execute a fixed, deterministic routing or averaging operation.
+- **What it captures**: Overall region context, background brightness, smooth spatial statistics.
+- **Core question**: *"What is the general, average activation level across this entire region?"*
 
-### Numerical demonstration on feature map `A`
-
-Let us apply a 2 × 2 Max Pooling window with stride `S = 1` on our 3 × 3 activation map `A`:
-
-```text
-A = [[12.0, 12.0, 17.0],
-     [10.0, 17.0, 19.0],
-     [ 9.0,  6.0, 14.0]]
-```
-
-#### Output dimensions:
+#### 3. Min Pooling (`min_pool2d`)
+Selects the single smallest element in each window:
 
 ```math
-H_{\mathrm{pool}} = \frac{3 - 2}{1} + 1 = 2
+\mathrm{MinPool}(A)_{i, j} = \min_{m=0}^{P_h - 1} \min_{n'=0}^{P_w - 1} A_{i \cdot S_h + m, \, j \cdot S_w + n'}
 ```
+
+- **What it captures**: Dark features on bright backgrounds (black text/ink, cracks, shadows, closest depth values in LiDAR).
+- **Core question**: *"What is the minimum activation or closest proximity within this local window?"*
+
+---
+
+### Fundamental mathematical inequality
+
+For any real-valued window of numbers, the minimum is always less than or equal to the
+average, which is always less than or equal to the maximum:
 
 ```math
-W_{\mathrm{pool}} = \frac{3 - 2}{1} + 1 = 2
-```
-
-#### Cell-by-cell pooling:
-
-1. **Top-Left Window `[0:2, 0:2]`**:
-   ```text
-   Window: [[12.0, 12.0],
-            [10.0, 17.0]]
-   ```
-   ```math
-   \mathrm{P\_map}_{0, 0} = \max(12.0, 12.0, 10.0, 17.0) = 17.0
-   ```
-
-2. **Top-Right Window `[0:2, 1:3]`**:
-   ```text
-   Window: [[12.0, 17.0],
-            [17.0, 19.0]]
-   ```
-   ```math
-   \mathrm{P\_map}_{0, 1} = \max(12.0, 17.0, 17.0, 19.0) = 19.0
-   ```
-
-3. **Bottom-Left Window `[1:3, 0:2]`**:
-   ```text
-   Window: [[10.0, 17.0],
-            [ 9.0,  6.0]]
-   ```
-   ```math
-   \mathrm{P\_map}_{1, 0} = \max(10.0, 17.0, 9.0, 6.0) = 17.0
-   ```
-
-4. **Bottom-Right Window `[1:3, 1:3]`**:
-   ```text
-   Window: [[17.0, 19.0],
-            [ 6.0, 14.0]]
-   ```
-   ```math
-   \mathrm{P\_map}_{1, 1} = \max(17.0, 19.0, 6.0, 14.0) = 19.0
-   ```
-
-#### Resulting pooled map:
-
-```text
-P_map = [[17.0, 19.0],
-         [17.0, 19.0]]
+\mathrm{MinPool}(A)_{i, j} \le \mathrm{AvgPool}(A)_{i, j} \le \mathrm{MaxPool}(A)_{i, j}
 ```
 
 ---
+
+### Numerical demonstration on the 5 × 5 padded feature map (Matching cnn.py)
+
+From Q4, the convolved feature map `output_pad1` obtained from our 5 × 5 input image is:
+
+```text
+A_padded = np.array([
+    [ 6.0, 14.0, 17.0, 11.0,  3.0],
+    [14.0, 12.0, 12.0, 17.0, 11.0],
+    [ 8.0, 10.0, 17.0, 19.0, 13.0],
+    [11.0,  9.0,  6.0, 14.0, 12.0],
+    [ 6.0,  4.0,  4.0,  6.0,  4.0]
+], dtype=np.float32)
+```
+
+We apply a **2 × 2 pooling window** (`P_h = 2, P_w = 2`) with **stride 2** (`S_h = 2, S_w = 2`).
+
+#### Output dimensions calculation:
+
+```math
+H_{\mathrm{pool}} = \left\lfloor \frac{5 - 2}{2} \right\rfloor + 1 = \lfloor 1.5 \rfloor + 1 = 2
+```
+
+```math
+W_{\mathrm{pool}} = \left\lfloor \frac{5 - 2}{2} \right\rfloor + 1 = \lfloor 1.5 \rfloor + 1 = 2
+```
+
+The output for all three pooling operations is a **2 × 2** matrix.
+
+#### Boundary truncation analysis (Why the 5th row and 5th column are excluded):
+
+With an input dimension of 5, a pool size of `P = 2`, and non-overlapping stride `S = 2`:
+- **Window 0** covers coordinate indices `0` and `1`.
+- **Window 1** covers coordinate indices `2` and `3`.
+- **Coordinate index 4** (the 5th row `[6.0, 4.0, 4.0, 6.0, 4.0]` and 5th column `[3.0, 11.0, 13.0, 12.0, 4.0]`) cannot form a valid 2-element window because coordinate `5` is outside the feature map bounds.
+
+Mathematically, the floor division operator in:
+
+```math
+H_{\mathrm{pool}} = \left\lfloor \frac{5 - 2}{2} \right\rfloor + 1 = \lfloor 1.5 \rfloor + 1 = 1 + 1 = 2
+```
+
+strictly truncates the fractional remainder `0.5`, discarding incomplete boundary windows. In standard deep learning frameworks (such as PyTorch's `nn.MaxPool2d`), this is the universal default behavior (`ceil_mode=False`).
+
+---
+
+#### Step-by-step arithmetic for all 4 pooling windows:
+
+#### Window (0, 0) — Top-Left: rows 0:2, cols 0:2
+```text
+Slice:
+[  6.0, 14.0 ]
+[ 14.0, 12.0 ]
+```
+- **Max Pooling**:
+  ```math
+  \mathrm{MaxPool}_{0, 0} = \max(6.0, 14.0, 14.0, 12.0) = \mathbf{14.0}
+  ```
+- **Average Pooling**:
+  ```math
+  \mathrm{AvgPool}_{0, 0} = \frac{6.0 + 14.0 + 14.0 + 12.0}{4} = \frac{46.0}{4} = \mathbf{11.5}
+  ```
+- **Min Pooling**:
+  ```math
+  \mathrm{MinPool}_{0, 0} = \min(6.0, 14.0, 14.0, 12.0) = \mathbf{6.0}
+  ```
+- **Inequality Check**: `6.0 <= 11.5 <= 14.0` (Min <= Avg <= Max verified).
+
+---
+
+#### Window (0, 1) — Top-Right: rows 0:2, cols 2:4
+```text
+Slice:
+[ 17.0, 11.0 ]
+[ 12.0, 17.0 ]
+```
+- **Max Pooling**:
+  ```math
+  \mathrm{MaxPool}_{0, 1} = \max(17.0, 11.0, 12.0, 17.0) = \mathbf{17.0}
+  ```
+- **Average Pooling**:
+  ```math
+  \mathrm{AvgPool}_{0, 1} = \frac{17.0 + 11.0 + 12.0 + 17.0}{4} = \frac{57.0}{4} = \mathbf{14.25}
+  ```
+- **Min Pooling**:
+  ```math
+  \mathrm{MinPool}_{0, 1} = \min(17.0, 11.0, 12.0, 17.0) = \mathbf{11.0}
+  ```
+- **Inequality Check**: `11.0 <= 14.25 <= 17.0` (Min <= Avg <= Max verified).
+
+---
+
+#### Window (1, 0) — Bottom-Left: rows 2:4, cols 0:2
+```text
+Slice:
+[  8.0, 10.0 ]
+[ 11.0,  9.0 ]
+```
+- **Max Pooling**:
+  ```math
+  \mathrm{MaxPool}_{1, 0} = \max(8.0, 10.0, 11.0, 9.0) = \mathbf{11.0}
+  ```
+- **Average Pooling**:
+  ```math
+  \mathrm{AvgPool}_{1, 0} = \frac{8.0 + 10.0 + 11.0 + 9.0}{4} = \frac{38.0}{4} = \mathbf{9.5}
+  ```
+- **Min Pooling**:
+  ```math
+  \mathrm{MinPool}_{1, 0} = \min(8.0, 10.0, 11.0, 9.0) = \mathbf{8.0}
+  ```
+- **Inequality Check**: `8.0 <= 9.5 <= 11.0` (Min <= Avg <= Max verified).
+
+---
+
+#### Window (1, 1) — Bottom-Right: rows 2:4, cols 2:4
+```text
+Slice:
+[ 17.0, 19.0 ]
+[  6.0, 14.0 ]
+```
+- **Max Pooling**:
+  ```math
+  \mathrm{MaxPool}_{1, 1} = \max(17.0, 19.0, 6.0, 14.0) = \mathbf{19.0}
+  ```
+- **Average Pooling**:
+  ```math
+  \mathrm{AvgPool}_{1, 1} = \frac{17.0 + 19.0 + 6.0 + 14.0}{4} = \frac{56.0}{4} = \mathbf{14.0}
+  ```
+- **Min Pooling**:
+  ```math
+  \mathrm{MinPool}_{1, 1} = \min(17.0, 19.0, 6.0, 14.0) = \mathbf{6.0}
+  ```
+- **Inequality Check**: `6.0 <= 14.0 <= 19.0` (Min <= Avg <= Max verified).
+
+---
+
+### Final verified pooling matrices (Matching cnn.py)
+
+#### 1. Max Pooled Map (2 × 2):
+```text
+P_max = np.array([
+    [14.0, 17.0],
+    [11.0, 19.0]
+], dtype=np.float32)
+```
+
+#### 2. Average Pooled Map (2 × 2):
+```text
+P_avg = np.array([
+    [11.5,  14.25],
+    [ 9.5,  14.0 ]
+], dtype=np.float32)
+```
+
+#### 3. Min Pooled Map (2 × 2):
+```text
+P_min = np.array([
+    [ 6.0, 11.0],
+    [ 8.0,  6.0]
+], dtype=np.float32)
+```
+
+---
+
+### Comparison of practical use cases in deep learning
+
+| Property | Max Pooling | Average Pooling | Min Pooling |
+| :--- | :--- | :--- | :--- |
+| **Formula** | `max(window)` | `mean(window)` | `min(window)` |
+| **Sensitivity** | High (sensitive to peaks/edges) | Medium (smoothes out spikes) | High (sensitive to valleys/shadows) |
+| **Preserved Signal** | Foreground features, sharp lines | Background tone, smooth texture | Dark pixels, holes, cracks, proximity |
+| **Modern Application** | Feature extractor in early/middle CNN layers | **Global Average Pooling (GAP)** at final classifier head | Depth sensing (LiDAR), OCR, morphological erosion |
+| **Post-ReLU Behavior** | Robust (preserves active activations) | Preserves positive energy | Collapses to `0.0` if any zero exists in window |
+
+---
+
 
 ## Q9 — Receptive field mathematics
 
@@ -1062,8 +1545,12 @@ dZ = dA * (Z > 0)
 
 ---
 
-### 5. Backpropagation through Max Pooling (The Argmax Mask)
+### 5. Backpropagation through Pooling Layers (Max, Average & Min Pooling)
 
+Because pooling operations do not contain learnable parameters, their backpropagation
+step only requires routing the upstream gradient `dP` back to the input activation `dA`.
+
+#### 5.1 Backpropagation through Max Pooling (The Argmax Mask)
 During the forward pass of Max Pooling, only one element in each pooling window achieved
 the maximum. Therefore, during backpropagation, the gradient flows **exclusively** to the
 single neuron that achieved the maximum. All other neurons in that window receive `0.0`.
@@ -1073,15 +1560,337 @@ single neuron that achieved the maximum. All other neurons in that window receiv
 ```
 
 In NumPy:
-
 ```python
 dA = np.zeros_like(A)
 for i in range(out_h):
     for j in range(out_w):
-        window = A[i * s : i * s + p_h, j * s : j * s + p_w]
-        max_val = np.max(window)
-        mask = (window == max_val)
-        dA[i * s : i * s + p_h, j * s : j * s + p_w] += mask * dP[i, j]
+        window = A[i * s_h : i * s_h + p_h, j * s_w : j * s_w + p_w]
+        mask = (window == np.max(window))
+        dA[i * s_h : i * s_h + p_h, j * s_w : j * s_w + p_w] += mask * dP[i, j]
+```
+
+#### 5.2 Backpropagation through Average Pooling (Uniform Gradient Distribution)
+In Average Pooling, each output neuron is the arithmetic mean of all elements in the pooling window:
+
+```math
+P_{i, j} = \frac{1}{P_h \cdot P_w} \sum_{m=0}^{P_h - 1} \sum_{n'=0}^{P_w - 1} A_{i \cdot S_h + m, \, j \cdot S_w + n'}
+```
+
+Therefore, the partial derivative with respect to each individual element in the window is constant:
+
+```math
+\frac{\partial P_{i, j}}{\partial A_{r, c}} = \frac{1}{P_h \cdot P_w}
+```
+
+By the chain rule, the upstream error gradient `\delta_{i, j}` is distributed **equally and uniformly**
+across every neuron in the pooling window:
+
+```math
+\frac{\partial L}{\partial A_{r, c}} = \frac{1}{P_h \cdot P_w} \cdot \delta^{\mathrm{pool}}_{i, j}
+```
+
+In NumPy:
+```python
+dA = np.zeros_like(A)
+for i in range(out_h):
+    for j in range(out_w):
+        dA[i * s_h : i * s_h + p_h, j * s_w : j * s_w + p_w] += dP[i, j] / (p_h * p_w)
+```
+
+#### 5.3 Backpropagation through Min Pooling (The Argmin Mask)
+Just like Max Pooling, Min Pooling routes the upstream gradient **exclusively** to the
+single neuron that achieved the minimum:
+
+```math
+\frac{\partial L}{\partial A_{r, c}} = \begin{cases} \delta^{\mathrm{pool}}_{i, j} & \text{if } (r, c) = \operatorname{argmin}(\mathrm{window}_{i, j}) \\ 0 & \text{otherwise} \end{cases}
+```
+
+In NumPy:
+```python
+dA = np.zeros_like(A)
+for i in range(out_h):
+    for j in range(out_w):
+        window = A[i * s_h : i * s_h + p_h, j * s_w : j * s_w + p_w]
+        mask = (window == np.min(window))
+        dA[i * s_h : i * s_h + p_h, j * s_w : j * s_w + p_w] += mask * dP[i, j]
+```
+
+---
+
+## Q12 — Complete mathematical mapping to cnn.py implementation
+
+This section provides an exhaustive, topic-by-topic mathematical cross-reference directly linking every line of code, formula, and numerical calculation in [`cnn.py`](file:///Users/pasan/Documents/Personal/deep-learning-foundations/05-cnn-from-scratch/src/cnn.py) to its underlying mathematical proof.
+
+---
+
+### Topic 1: Numerical Precision and Memory Footprint (`np.float32`)
+- **Code reference**: [`cnn.py:L18-26`](file:///Users/pasan/Documents/Personal/deep-learning-foundations/05-cnn-from-scratch/src/cnn.py#L18-L26)
+
+#### Mathematical Representation (IEEE 754):
+Every floating-point scalar is stored in 32-bit single precision:
+- **1 sign bit** (`s`)
+- **8 exponent bits** (`e`), bias = 127
+- **23 fraction/mantissa bits** (`m`)
+
+```math
+v = (-1)^s \times 2^{e - 127} \times \left( 1 + \sum_{i=1}^{23} b_{23 - i} 2^{-i} \right)
+```
+
+#### Memory Footprint Equations:
+
+```math
+\mathrm{Memory}_{\mathrm{FP32}} = N_{\mathrm{elements}} \times 4 \text{ bytes}
+```
+
+```math
+\mathrm{Memory}_{\mathrm{FP64}} = N_{\mathrm{elements}} \times 8 \text{ bytes}
+```
+
+For our 5 × 5 image:
+- FP32: 25 × 4 = 100 bytes
+- FP64: 25 × 8 = 200 bytes (100% overhead)
+
+#### Hardware & Computational Efficiency:
+1. **Memory Bandwidth**: Deep learning workloads are predominantly memory-bandwidth bound. Halving memory footprint doubles throughput across memory buses.
+2. **SIMD & Tensor Cores**: Standard modern processors (Intel AVX2, ARM NEON, NVIDIA Tensor Cores) pack twice as many FP32 operations into a single clock cycle compared to FP64 (e.g. 8 floats per 256-bit AVX register vs. 4 doubles).
+3. **Sufficient Precision**: Neural network weights and activations are inherently stochastic; the 23-bit mantissa provides ~7 decimal digits of precision, which is more than sufficient for gradient descent convergence.
+
+---
+
+### Topic 2: Baseline Unpadded Discrete Convolution (`conv2d_unpadded`)
+- **Code reference**: [`cnn.py:L35-87`](file:///Users/pasan/Documents/Personal/deep-learning-foundations/05-cnn-from-scratch/src/cnn.py#L35-L87)
+
+#### 1. Universal Output Dimension Formula (Valid Padding, P = 0):
+
+```math
+H_{\mathrm{out}} = \left\lfloor \frac{H - K_h}{S_h} \right\rfloor + 1, \quad W_{\mathrm{out}} = \left\lfloor \frac{W - K_w}{S_w} \right\rfloor + 1
+```
+
+- **For unit stride (S = 1)**:
+  ```math
+  H_{\mathrm{out}} = \left\lfloor \frac{5 - 3}{1} \right\rfloor + 1 = 3, \quad W_{\mathrm{out}} = \left\lfloor \frac{5 - 3}{1} \right\rfloor + 1 = 3
+  ```
+- **For stride (2, 2)**:
+  ```math
+  H_{\mathrm{out}} = \left\lfloor \frac{5 - 3}{2} \right\rfloor + 1 = 2, \quad W_{\mathrm{out}} = \left\lfloor \frac{5 - 3}{2} \right\rfloor + 1 = 2
+  ```
+
+#### 2. Memory Pre-Allocation Architecture:
+- `np.zeros((H_out, W_out), dtype=np.float32)` allocates a contiguous block of `H_out * W_out * 4` bytes. In CPython, arrays use row-major contiguous memory indexing:
+  ```math
+  \mathrm{Address}(i, j) = \mathrm{BaseAddress} + (i \cdot W_{\mathrm{out}} + j) \times 4
+  ```
+- Python nested lists create pointer fragmentation: an outer list of pointers to inner lists of pointers to 28-byte `PyFloatObject` instances.
+
+#### 3. Sliding Window Slicing and Hadamard Reduction:
+For each coordinate `(i, j)`:
+```math
+r_{\mathrm{start}} = i \cdot S_h, \quad c_{\mathrm{start}} = j \cdot S_w
+```
+
+```math
+\mathrm{patch}_{i, j} = X[r_{\mathrm{start}} : r_{\mathrm{start}} + K_h, \, c_{\mathrm{start}} : c_{\mathrm{start}} + K_w]
+```
+
+```math
+Z_{i, j} = \left( \sum_{m=0}^{K_h - 1} \sum_{n=0}^{K_w - 1} \mathrm{patch}_{m, n} \cdot K_{m, n} \right) + b
+```
+
+#### Verified Numerical Output (3 × 3):
+```text
+[[12.0, 12.0, 17.0],
+ [10.0, 17.0, 19.0],
+ [ 9.0,  6.0, 14.0]]
+```
+
+---
+
+### Topic 3: Zero-Padded Discrete Convolution (`conv2d`)
+- **Code reference**: [`cnn.py:L92-152`](file:///Users/pasan/Documents/Personal/deep-learning-foundations/05-cnn-from-scratch/src/cnn.py#L92-L152)
+
+#### 1. Canvas Allocation and Insertion:
+When `padding = 1`, the dimensions expand:
+```math
+H_{\mathrm{padded}} = H_{\mathrm{in}} + 2 P_h = 5 + 2(1) = 7
+```
+```math
+W_{\mathrm{padded}} = W_{\mathrm{in}} + 2 P_w = 5 + 2(1) = 7
+```
+
+Mapping the input image into the center of the zero canvas:
+```math
+X_{\mathrm{padded}}[P_h : P_h + H_{\mathrm{in}}, \, P_w : P_w + W_{\mathrm{in}}] = X
+```
+
+#### 2. Mathematical Neutrality of Zero-Padding:
+Why must the border be padded with `0.0` and not `1.0`?
+```math
+0.0 \cdot K_{m, n} = 0.0 \quad (\text{Additive identity in }\mathbb{R})
+```
+Padding with `0` contributes zero energy to the linear sum. If padded with `1.0`, the border pixels would contribute `1.0 * K_{m, n} = K_{m, n}`, creating artificial high-energy boundary artifacts that corrupt edge detectors.
+
+#### 3. Spatial Dimension Preservation ("Same" Padding):
+```math
+H_{\mathrm{out}} = \left\lfloor \frac{7 - 3}{1} \right\rfloor + 1 = 5, \quad W_{\mathrm{out}} = \left\lfloor \frac{7 - 3}{1} \right\rfloor + 1 = 5
+```
+
+#### 4. Verified Numerical Output (`output_pad1`, 5 × 5):
+```text
+[[ 6.0, 14.0, 17.0, 11.0,  3.0],
+ [14.0, 12.0, 12.0, 17.0, 11.0],
+ [ 8.0, 10.0, 17.0, 19.0, 13.0],
+ [11.0,  9.0,  6.0, 14.0, 12.0],
+ [ 6.0,  4.0,  4.0,  6.0,  4.0]]
+```
+
+---
+
+### Topic 4: Max Pooling Layer (`max_pool2d`)
+- **Code reference**: [`cnn.py:L154-180`](file:///Users/pasan/Documents/Personal/deep-learning-foundations/05-cnn-from-scratch/src/cnn.py#L154-L180)
+
+#### 1. Downsampling Dimension Formula:
+For input `5 × 5`, window `2 × 2`, and stride `2`:
+```math
+H_{\mathrm{pool}} = \left\lfloor \frac{5 - 2}{2} \right\rfloor + 1 = 2, \quad W_{\mathrm{pool}} = \left\lfloor \frac{5 - 2}{2} \right\rfloor + 1 = 2
+```
+
+#### 2. Boundary Truncation:
+The 5th row (`[6.0, 4.0, 4.0, 6.0, 4.0]`) and 5th column (`[3.0, 11.0, 13.0, 12.0, 4.0]`) are dropped because non-overlapping windows of size 2 cannot exceed the coordinate boundary:
+- Window 0: coordinates `[0, 1]`
+- Window 1: coordinates `[2, 3]`
+- Coordinate `4`: remainder truncated by `floor((5 - 2)/2)`.
+
+#### 3. Quadrant Arithmetic:
+```math
+\mathrm{MaxPool}_{0, 0} = \max(6.0, 14.0, 14.0, 12.0) = \mathbf{14.0}
+```
+```math
+\mathrm{MaxPool}_{0, 1} = \max(17.0, 11.0, 12.0, 17.0) = \mathbf{17.0}
+```
+```math
+\mathrm{MaxPool}_{1, 0} = \max(8.0, 10.0, 11.0, 9.0) = \mathbf{11.0}
+```
+```math
+\mathrm{MaxPool}_{1, 1} = \max(17.0, 19.0, 6.0, 14.0) = \mathbf{19.0}
+```
+
+#### Verified Numerical Output (2 × 2):
+```text
+[[14.0, 17.0],
+ [11.0, 19.0]]
+```
+
+---
+
+### Topic 5: Average Pooling Layer (`avg_pool2d`)
+- **Code reference**: [`cnn.py:L181-205`](file:///Users/pasan/Documents/Personal/deep-learning-foundations/05-cnn-from-scratch/src/cnn.py#L181-L205)
+
+#### 1. Mathematical Operation:
+```math
+\mathrm{AvgPool}(A)_{i, j} = \frac{1}{P_h \cdot P_w} \sum_{m=0}^{P_h - 1} \sum_{n'=0}^{P_w - 1} A_{i \cdot S_h + m, \, j \cdot S_w + n'}
+```
+
+#### 2. Quadrant Arithmetic:
+```math
+\mathrm{AvgPool}_{0, 0} = \frac{6.0 + 14.0 + 14.0 + 12.0}{4} = \frac{46.0}{4} = \mathbf{11.5}
+```
+```math
+\mathrm{AvgPool}_{0, 1} = \frac{17.0 + 11.0 + 12.0 + 17.0}{4} = \frac{57.0}{4} = \mathbf{14.25}
+```
+```math
+\mathrm{AvgPool}_{1, 0} = \frac{8.0 + 10.0 + 11.0 + 9.0}{4} = \frac{38.0}{4} = \mathbf{9.5}
+```
+```math
+\mathrm{AvgPool}_{1, 1} = \frac{17.0 + 19.0 + 6.0 + 14.0}{4} = \frac{56.0}{4} = \mathbf{14.0}
+```
+
+#### Verified Numerical Output (2 × 2):
+```text
+[[11.5,  14.25],
+ [ 9.5,  14.0 ]]
+```
+
+---
+
+### Topic 6: Min Pooling Layer (`min_pool2d`)
+- **Code reference**: [`cnn.py:L207-231`](file:///Users/pasan/Documents/Personal/deep-learning-foundations/05-cnn-from-scratch/src/cnn.py#L207-L231)
+
+#### 1. Mathematical Operation:
+```math
+\mathrm{MinPool}(A)_{i, j} = \min_{m=0}^{P_h - 1} \min_{n'=0}^{P_w - 1} A_{i \cdot S_h + m, \, j \cdot S_w + n'}
+```
+
+#### 2. Quadrant Arithmetic:
+```math
+\mathrm{MinPool}_{0, 0} = \min(6.0, 14.0, 14.0, 12.0) = \mathbf{6.0}
+```
+```math
+\mathrm{MinPool}_{0, 1} = \min(17.0, 11.0, 12.0, 17.0) = \mathbf{11.0}
+```
+```math
+\mathrm{MinPool}_{1, 0} = \min(8.0, 10.0, 11.0, 9.0) = \mathbf{8.0}
+```
+```math
+\mathrm{MinPool}_{1, 1} = \min(17.0, 19.0, 6.0, 14.0) = \mathbf{6.0}
+```
+
+#### Verified Numerical Output (2 × 2):
+```text
+[[ 6.0, 11.0],
+ [ 8.0,  6.0]]
+```
+
+---
+
+### Topic 7: The Cross-Pooling Invariant Inequality Proof
+- **Theorem**: For any finite non-empty real-valued window `W = {w_1, w_2, ..., w_k}`:
+  ```math
+  \min(W) \le \frac{1}{k} \sum_{i=1}^{k} w_i \le \max(W)
+  ```
+- **Proof**:
+  Let `m = min(W)` and `M = max(W)`. By definition:
+  ```math
+  \forall i \in \{1, \dots, k\}, \quad m \le w_i \le M
+  ```
+  Summing across all `k` elements:
+  ```math
+  \sum_{i=1}^{k} m \le \sum_{i=1}^{k} w_i \le \sum_{i=1}^{k} M \implies k \cdot m \le \sum_{i=1}^{k} w_i \le k \cdot M
+  ```
+  Dividing by scalar `k > 0`:
+  ```math
+  m \le \frac{1}{k} \sum_{i=1}^{k} w_i \le M
+  ```
+  Equality `m = mean(W) = M` holds if and only if all elements in the window are identical (`w_1 = w_2 = ... = w_k`).
+
+#### Quadrant Verification on `output_pad1`:
+
+| Quadrant | Window Slice | Min Value | Avg Value | Max Value | Verified Chain |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `(0, 0)` | `[[6, 14], [14, 12]]` | 6.0 | 11.50 | 14.0 | `6.0 <= 11.5 <= 14.0` |
+| `(0, 1)` | `[[17, 11], [12, 17]]` | 11.0 | 14.25 | 17.0 | `11.0 <= 14.25 <= 17.0` |
+| `(1, 0)` | `[[8, 10], [11, 9]]` | 8.0 | 9.50 | 11.0 | `8.0 <= 9.5 <= 11.0` |
+| `(1, 1)` | `[[17, 19], [6, 14]]` | 6.0 | 14.00 | 19.0 | `6.0 <= 14.0 <= 19.0` |
+
+---
+
+### Topic 8: Execution Script Numerical Verification Audit
+- **Code reference**: [`cnn.py:L233-317`](file:///Users/pasan/Documents/Personal/deep-learning-foundations/05-cnn-from-scratch/src/cnn.py#L233-L317)
+
+Every numerical print statement produced by running `python cnn.py` is audited below:
+
+```text
+====================================================================================================
+EXECUTION STEP               NUMERICAL OUTPUT                                       STATUS
+====================================================================================================
+1. Input Image (5x5)         [[3, 3, 2, 1, 0], [0, 0, 1, 3, 1], ...]                VERIFIED (Exact)
+2. Kernel (3x3)              [[0, 1, 2], [2, 2, 0], [0, 1, 2]]                      VERIFIED (Exact)
+3. Convolved Feature Map     3x3 matrix: [[12, 12, 17], [10, 17, 19], [9, 6, 14]]   VERIFIED (Exact)
+4. Valid Padding (pad=0)     [0, 0] = 12.0 (4-step breakdown: patch*K -> sum -> +b) VERIFIED (Exact)
+5. Same Padding (pad=1)      7x7 canvas, 5x5 map, [0, 0] = 6.0 (5-step breakdown)   VERIFIED (Exact)
+6. Max Pooled Map (2x2)      [[14.0, 17.0], [11.0, 19.0]]                           VERIFIED (Exact)
+7. Average Pooled Map (2x2)  [[11.5, 14.25], [9.5, 14.0]]                           VERIFIED (Exact)
+8. Min Pooled Map (2x2)      [[6.0, 11.0], [8.0, 6.0]]                              VERIFIED (Exact)
+====================================================================================================
 ```
 
 ---
@@ -1089,16 +1898,19 @@ for i in range(out_h):
 ## Summary of the complete mathematical pipeline
 
 ```text
-========================================================================================
+====================================================================================================
 STEP                          FORWARD OPERATION                               BACKWARD GRADIENT
-========================================================================================
+====================================================================================================
 1. Conv2D Layer               Z[i,j] = sum(X_patch * K) + b                   dK = sum(dZ[i,j] * X_patch)
                                                                               db = sum(dZ)
                                                                               dX = dZ *_full rot180(K)
 
 2. Non-linear Activation      A = max(0, Z)                                   dZ = dA * (Z > 0)
 
-3. Downsampling (MaxPool)     P_map[i,j] = max(A_window)                      dA = dP * (A_window == max)
+3. Downsampling (Pooling):
+   - Max Pooling              P_map[i,j] = max(A_window)                      dA = dP * (A_window == max)
+   - Average Pooling          P_map[i,j] = mean(A_window)                     dA = dP / (P_h * P_w)
+   - Min Pooling              P_map[i,j] = min(A_window)                      dA = dP * (A_window == min)
 
 4. Spatial Unrolling          a_flat = P_map.reshape(-1, 1)                   dP_map = da_flat.reshape(P_map.shape)
 
@@ -1108,8 +1920,9 @@ STEP                          FORWARD OPERATION                               BA
 
 6. Probability Normalization  P = softmax(Z_dense)                            dZ_dense = (P - Y) / m
    & Cross-Entropy Loss       L = -sum(Y * log(P))
-========================================================================================
+====================================================================================================
 ```
 
 This completes the foundational mathematics for Project 05. The next step is validating
 each of these formulas in executable NumPy code.
+
