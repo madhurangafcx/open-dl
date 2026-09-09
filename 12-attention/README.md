@@ -128,10 +128,22 @@ For self-attention with input representation `X \in \mathbb{R}^{T \times d_{\mat
 \mathrm{head}_i = \mathrm{Attention}\left(X W_i^Q, X W_i^K, X W_i^V\right) \in \mathbb{R}^{T \times d_v}
 ```
 
-For general attention where Queries originate from sequence `X_Q` and Keys/Values originate from sequence `X_{KV}` (such as in decoder-encoder cross-attention):
+For general attention where Queries originate from sequence `X_Q` and Keys/Values originate from sequence `X_{KV}` (such as decoder-encoder cross-attention), let `T_q` be the query sequence length and `T_{kv}` the key/value sequence length:
 
 ```math
-\mathrm{head}_i = \mathrm{Attention}\left(X_Q W_i^Q, X_{KV} W_i^K, X_{KV} W_i^V\right) \in \mathbb{R}^{T \times d_v}
+X_Q \in \mathbb{R}^{T_q \times d_{\mathrm{model}}}, \qquad X_{KV} \in \mathbb{R}^{T_{kv} \times d_{\mathrm{model}}}
+```
+
+For each head:
+
+```math
+\mathrm{head}_i = \mathrm{Attention}\left(X_Q W_i^Q, X_{KV} W_i^K, X_{KV} W_i^V\right) \in \mathbb{R}^{T_q \times d_v}
+```
+
+with:
+
+```math
+Q K^T \in \mathbb{R}^{T_q \times T_{kv}}
 ```
 
 And:
@@ -168,7 +180,11 @@ LIMITATION 2: THE FIXED-DIMENSIONAL INFORMATION BOTTLENECK
 Modern hardware accelerators (NVIDIA GPUs, Google TPUs) achieve extreme floating-point throughput by executing tens of thousands of matrix operations in **parallel**.
 - In an RNN, step `t` strictly requires the output `h_{t-1}` from the preceding step.
 - As sequence length `T` grows from `50` to `4,096`, the sequential execution graph grows linearly `O(T)`.
-- **Self-attention eliminates recurrence**: all `T` token representations can be projected and their pairwise similarities computed in parallel, with `O(1)` sequential depth. While the pairwise attention score and value mixing operation requires `O(T^2 \cdot d)` work, the complete Multi-Head Attention layer (including projections) has total computational cost approximately `O(T \cdot d_{\mathrm{model}}^2 + T^2 \cdot d_{\mathrm{model}})`.
+- **Self-attention eliminates recurrence**: all `T` token representations can be projected and their pairwise similarities computed in parallel, with `O(1)` sequential depth. The pairwise attention score and value-mixing operation requires `O(T^2 \cdot d_{\mathrm{model}})` work, while the complete self-attention layer (including Q/K/V/output projections) has total computational cost approximately:
+
+  ```math
+  O(T \cdot d_{\mathrm{model}}^2 + T^2 \cdot d_{\mathrm{model}})
+  ```
 
 ---
 
