@@ -26,7 +26,7 @@ THE PARADIGM SHIFT: RECURRENT COMPRESSION VS. ATTENTION HIGHWAYS
            ▲                 ▲                 ▲                 ▲
            x₁                x₂                x₃                x₄
    * Path length between x₁ and x₄ is O(T) sequential steps!
-   * Early context is compressed, degraded, and overwritten.
+   * Early context must be carried through successive recurrent states and may be progressively transformed, attenuated, or forgotten.
 
 2. SELF-ATTENTION MECHANISM (Direct O(1) Path-Length Shortcuts):
    x₁ ───────────┬──────────────┬──────────────┬──────────────► Context Vector c₁
@@ -138,20 +138,20 @@ And:
 
 ## Why Did We Need Attention? The Collapse of Recurrence
 
-Before the Transformer architecture, state-of-the-art Natural Language Processing relied on Recurrent Neural Networks (RNNs, LSTMs, and GRUs). While capable of handling sequential data, recurrent models suffered from **two fatal architectural flaws**:
+Before the Transformer architecture, state-of-the-art Natural Language Processing relied on Recurrent Neural Networks (RNNs, LSTMs, and GRUs). While capable of handling sequential data, recurrent models suffered from **two major architectural limitations**:
 
 ```text
 ====================================================================================================
-THE TWO FATAL FLAWS OF RECURRENT MODELS
+THE TWO MAJOR LIMITATIONS OF RECURRENT MODELS
 ====================================================================================================
 
-FLAW 1: THE SEQUENTIAL COMPUTATION BOTTLENECK (Limited Time-Parallelization)
+LIMITATION 1: THE SEQUENTIAL COMPUTATION BOTTLENECK (Limited Time-Parallelization)
    Timestep 1 ──► Timestep 2 ──► Timestep 3 ──► ... ──► Timestep 1000
    To compute h₁₀₀₀, the computer MUST sequentially execute steps 1 through 999.
    * GPU parallelism is limited across timesteps because each timestep depends on the previous hidden state.
    * The recurrent dependency creates O(T) sequential steps, preventing full parallelization across time (with computational complexity around O(T · d²)).
 
-FLAW 2: THE FIXED-DIMENSIONAL INFORMATION BOTTLENECK
+LIMITATION 2: THE FIXED-DIMENSIONAL INFORMATION BOTTLENECK
    "A 1000-word contract" ──────────► Compressed into ──► Vector h₁₀₀₀ (e.g., 512 numbers)
    Compressing long sequences into a fixed-dimensional recurrent state can make it
    difficult to preserve and access fine-grained information from early positions.
@@ -179,7 +179,7 @@ Token 1 ("The") ................................................. Token T ("was"
   ```math
   \text{Path Length}_{\mathrm{RNN}} = O(T)
   ```
-- Even with LSTM's Constant Error Carousel or GRU's state interpolation, gradients and semantic signals degrade over dozens of sequential transitions.
+- Even with LSTM's Constant Error Carousel or GRU's gated state updates, information and gradient signals must traverse multiple sequential transformations, making long-range dependency learning more difficult.
 
 - In Self-Attention, **every token directly attends to every other token**:
   ```math
@@ -254,8 +254,7 @@ S = Q K^T \quad \text{vs.} \quad S_{\mathrm{scaled}} = \frac{Q K^T}{\sqrt{d_k}}
 
 ### The Mathematical Variance Proof:
 
-Let `q = (q_1, q_2, \dots, q_{d_k})` and `k = (k_1, k_2, \dots, k_{d_k})` be independent random feature vectors in `\mathbb{R}^{d_k}`.
-Assume each component has zero mean and unit variance:
+Let `q = (q_1, q_2, \dots, q_{d_k})` and `k = (k_1, k_2, \dots, k_{d_k})` be independent random feature vectors in `\mathbb{R}^{d_k}`. Assume their components are also independent across dimensions, with zero mean and unit variance:
 
 ```math
 \mathbb{E}[q_i] = 0, \quad \operatorname{Var}(q_i) = 1
@@ -465,13 +464,19 @@ Sequence A: "The dog bit the man"
 Sequence B: "The man bit the dog"
 ```
 
-In pure self-attention without positional encodings:
-- The dot product between word vectors `x_i \cdot x_j` depends **only on their feature values**, not their sequence position index.
-- Permuting the input rows permutes the output rows identically (permutation equivariance):
+- Pure self-attention is strictly permutation-equivariant: for any permutation matrix `P`,
+
   ```math
-  \mathrm{Attention}(P X) = P \mathrm{Attention}(X)
+  \mathrm{Attention}(PX) = P\,\mathrm{Attention}(X)
   ```
-- Pure self-attention is strictly permutation-equivariant: for any permutation matrix `P`, `\mathrm{Attention}(P X) = P \mathrm{Attention}(X)`. Permuting the input tokens simply permutes the resulting output tokens by the identical permutation without altering pairwise attention weights or feature interactions. Without positional encodings, the mechanism cannot incorporate token positions or sequential order into its computations.
+
+  The corresponding attention matrix transforms as
+
+  ```math
+  A(PX) = P\,A(X)\,P^T
+  ```
+
+  so the same pairwise relationships are preserved under permutation, but their positions in the attention matrix are permuted accordingly. Without positional encodings, the mechanism cannot incorporate token positions or sequential order into its computations.
 
 ---
 
@@ -535,7 +540,7 @@ THE 3 ATTENTION FLAVORS IN THE TRANSFORMER (Vaswani et al. Architecture)
    * Mask:         Causal Lower-Triangular Mask (Prevents attending to future words)
 
 3. CROSS-ATTENTION (ENCODER-DECODER ATTENTION):
-   * Query source: Decoder Masked Self-Attention Output (after Add & Norm)
+   * Query source: Output of the decoder's masked self-attention sub-layer
    * Key source:   Final Encoder Output
    * Value source: Final Encoder Output
    * Mask:         None / Source Padding Mask
@@ -789,4 +794,4 @@ PYTORCH PARITY & VALIDATION
 
 Mastering the Attention Mechanism is the definitive bridge from the **Sequential Recurrent Era** (`07-rnn`, `08-sentiment-rnn`, `09-lstm`, `10-gru`, `11-sequence-prediction`) to the modern **Transformer & Generative AI Era** (`13-mini-transformer`, `14-mini-llm`).
 
-The next immediate step is deriving and verifying every equation, Jacobian matrix, and finite-difference check in [steps/step-01-mathematics.md](file:///Users/pasan/Documents/Personal/deep-learning-foundations/12-attention/steps/step-01-mathematics.md), followed by the pure NumPy implementation in [src/attention.py](file:///Users/pasan/Documents/Personal/deep-learning-foundations/12-attention/src/attention.py).
+The next immediate step is deriving and verifying every equation, Jacobian matrix, and finite-difference check in [steps/step-01-mathematics.md](steps/step-01-mathematics.md), followed by the pure NumPy implementation in [src/attention.py](src/attention.py).
