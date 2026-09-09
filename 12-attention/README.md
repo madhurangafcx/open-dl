@@ -28,12 +28,12 @@ THE PARADIGM SHIFT: RECURRENT COMPRESSION VS. ATTENTION HIGHWAYS
    * Path length between x₁ and x₄ is O(T) sequential steps!
    * Early context is compressed, degraded, and overwritten.
 
-2. SELF-ATTENTION MECHANISM (Direct O(1) All-to-All Shortcuts):
+2. SELF-ATTENTION MECHANISM (Direct O(1) Path-Length Shortcuts):
    x₁ ───────────┬──────────────┬──────────────┬──────────────► Context Vector c₁
    x₂ ───────────┼──────────────┼──────────────┼──────────────► Context Vector c₂
    x₃ ───────────┼──────────────┼──────────────┼──────────────► Context Vector c₃
    x₄ ───────────┴──────────────┴──────────────┴──────────────► Context Vector c₄
-         All tokens attend directly to all other tokens in O(1) operations!
+         All tokens can attend directly to all other tokens, giving O(1) maximum path length.
 ====================================================================================================
 ```
 
@@ -62,7 +62,9 @@ Where:
 - `W^Q \in \mathbb{R}^{d_{\mathrm{model}} \times d_k}`: Query projection weight matrix.
 - `W^K \in \mathbb{R}^{d_{\mathrm{model}} \times d_k}`: Key projection weight matrix.
 - `W^V \in \mathbb{R}^{d_{\mathrm{model}} \times d_v}`: Value projection weight matrix.
-- Typically, `d_k = d_v = d_{\mathrm{model}} / h` (where `h` is the number of attention heads).
+- `d_k`: Query/Key dimension per head.
+- `d_v`: Value dimension per head.
+- In this implementation, `d_k = d_v = d_{\mathrm{model}} / h` (where `h` is the number of attention heads).
 
 ---
 
@@ -143,24 +145,24 @@ Before the Transformer architecture, state-of-the-art Natural Language Processin
 THE TWO FATAL FLAWS OF RECURRENT MODELS
 ====================================================================================================
 
-FLAW 1: THE SEQUENTIAL COMPUTATION BOTTLENECK (No Parallelization)
+FLAW 1: THE SEQUENTIAL COMPUTATION BOTTLENECK (Limited Time-Parallelization)
    Timestep 1 ──► Timestep 2 ──► Timestep 3 ──► ... ──► Timestep 1000
    To compute h₁₀₀₀, the computer MUST sequentially execute steps 1 through 999.
-   * GPU execution units sit idle waiting for temporal unrolling.
-   * Training time scales strictly as O(T) sequential operations!
+   * GPU parallelism is limited across timesteps because each timestep depends on the previous hidden state.
+   * The recurrent dependency creates O(T) sequential steps, preventing full parallelization across time (with computational complexity around O(T · d²)).
 
 FLAW 2: THE FIXED-DIMENSIONAL INFORMATION BOTTLENECK
    "A 1000-word contract" ──────────► Compressed into ──► Vector h₁₀₀₀ (e.g., 512 numbers)
-   Compressing an entire paragraph, article, or conversation into a single vector h_T
-   causes catastrophic information loss. The model forgets early details.
+   Compressing long sequences into a fixed-dimensional recurrent state can make it
+   difficult to preserve and access fine-grained information from early positions.
 ====================================================================================================
 ```
 
 ### 1. The Sequential Bottleneck: Why GPUs Hate RNNs
 Modern hardware accelerators (NVIDIA GPUs, Google TPUs) achieve extreme floating-point throughput by executing tens of thousands of matrix operations in **parallel**.
 - In an RNN, step `t` strictly requires the output `h_{t-1}` from the preceding step.
-- As sequence length `T` grows from `50` to `4,096`, training time scales linearly `O(T)`.
-- **Self-Attention eliminates recurrence completely**: all `T` token representations are projected and compared against each other simultaneously in a single parallel GEMM (General Matrix Multiply) operation `O(1)` sequential steps!
+- As sequence length `T` grows from `50` to `4,096`, the sequential execution graph grows linearly `O(T)`.
+- **Self-attention eliminates recurrence**: all `T` token representations can be projected and their pairwise similarities computed in parallel, with `O(1)` sequential depth. The actual computational work remains approximately `O(T^2 \cdot d)`.
 
 ---
 
@@ -183,7 +185,7 @@ Token 1 ("The") ................................................. Token T ("was"
   ```math
   \text{Path Length}_{\mathrm{Attention}} = O(1)
   ```
-  Token 1 directly computes a dot-product with Token `T` in a single step! There is zero decay across temporal distances.
+  Token 1 directly computes a dot-product with Token `T` in a single step! There is no additional sequential path-length growth with token distance: the maximum attention path length is `O(1)`.
 
 ---
 
@@ -197,7 +199,7 @@ Token 1 ("The") ................................................. Token T ("was"
 | **Convolutional (1D CNN)** | `O(k \cdot T \cdot d^2)` | **`O(1)`** (Parallel receptive fields) | **`O(\log_k(T))`** (Tree height) | `O(T \cdot d)` |
 
 > [!IMPORTANT]
-> When sequence length `T` is smaller than representation dimension `d` (typical in NLP: `T = 512, d = 768`), Self-Attention is computationally **faster** than recurrent layers, while allowing complete GPU parallelization and `O(1)` path length!
+> Computational complexity is fundamentally distinct from sequential dependency depth. When `T` is not too large relative to `d` (e.g., standard sentence lengths where `T \cdot d < d^2`), self-attention can be competitive with or more efficient than recurrent layers, while offering much greater parallelism due to `O(1)` sequential operations.
 
 ---
 
@@ -231,8 +233,8 @@ NEURAL SOFT ATTENTION LOOKUP (Continuous, Differentiable):
 
 ### Why Separate Projections for Q, K, and V?
 If we directly computed `\operatorname{softmax}(X X^T) X`:
-- Every token would be forced to use the exact same vector representation as its query, its key, and its value.
-- A token would always attend most strongly to itself (`x_i \cdot x_i = \|x_i\|^2`), severely biasing the diagonal.
+- Using `X` directly for `Q`, `K`, and `V` couples the search representation, matching representation, and retrieved content.
+- It can also produce strong self-similarity because `x_i \cdot x_i = \|x_i\|^2`, which can bias attention toward the diagonal.
 - By introducing separate learned weight matrices `W^Q`, `W^K`, and `W^V`:
   1. A token can **search** for one concept (via `Q`).
   2. It can **advertise** another concept to other tokens (via `K`).
@@ -242,7 +244,7 @@ If we directly computed `\operatorname{softmax}(X X^T) X`:
 
 ## The Mathematical Proof: Why Scale by 1 / sqrt(d_k)?
 
-A defining hallmark of the Vaswani et al. paper is the **scaling factor** `\frac{1}{\sqrt{d_k}}`. Why is this normalization mathematically mandatory?
+A defining hallmark of the Vaswani et al. paper is the **scaling factor** `\frac{1}{\sqrt{d_k}}`. Why did Vaswani et al. introduce the scaling factor `\frac{1}{\sqrt{d_k}}`?
 
 ```math
 S = Q K^T \quad \text{vs.} \quad S_{\mathrm{scaled}} = \frac{Q K^T}{\sqrt{d_k}}
@@ -295,32 +297,35 @@ Therefore, the **standard deviation** of the unscaled dot product is:
 \operatorname{std}(S) = \sqrt{\operatorname{Var}(S)} = \sqrt{d_k}
 ```
 
+> [!NOTE]
+> This derivation represents an idealized statistical argument under standard independent zero-mean and unit-variance initialization assumptions (e.g., standard normal or Xavier initialization). It provides the theoretical rationale for introducing the scaling factor at initialization, rather than guaranteeing that trained Query and Key vectors maintain these exact distributions throughout optimization.
+
 ---
 
-### The Vanishing Gradient Softmax Catastrophe:
+### Softmax Saturation from Large Dot-Product Variance:
 
 As representation dimension `d_k` grows large (e.g., `d_k = 64` or `d_k = 128`):
-- The magnitude of dot products grows proportional to `\sqrt{64} = 8` or `\sqrt{128} \approx 11.3`.
+- The variance of the dot products grows proportionally to `d_k`, meaning standard deviations scale as `\sqrt{64} = 8` or `\sqrt{128} \approx 11.3`.
 - When extremely large numbers enter the Softmax function `\operatorname{softmax}(z)`:
   ```math
   \operatorname{softmax}([+12.0, -11.0, -9.0]) \approx [0.99999, 0.00000, 0.00000]
   ```
-- The distribution collapses into a one-hot sharp peak!
-- **The derivative of Softmax** is:
+- The distribution collapses toward a saturated one-hot distribution.
+- **The Jacobian of Softmax** is:
   ```math
   \frac{\partial \operatorname{softmax}(z)_i}{\partial z_j} = \hat{y}_i (\delta_{ij} - \hat{y}_j)
   ```
-  When `\hat{y}_i \approx 1.0` or `\hat{y}_i \approx 0.0`, the gradient `\hat{y}_i (1 - \hat{y}_i) \to 0.0`!
-- The entire attention mechanism suffers from **vanishing gradients**, halting parameter updates during backpropagation.
+  For the diagonal terms where `i = j`, this reduces to `\hat{y}_i (1 - \hat{y}_i)`. When probabilities saturate (`\hat{y}_i \approx 1.0` or `\hat{y}_i \approx 0.0`), both diagonal and off-diagonal Jacobian terms approach zero.
+- When the logits become highly separated, Softmax can saturate and the resulting gradients can become very small, making optimization more difficult.
 
-#### The Elegant Fix:
-Dividing by `\sqrt{d_k}` scales the variance back to unit variance:
+#### The Scaling Solution:
+Dividing by `\sqrt{d_k}` scales the variance back to unit variance under the stated initialization assumptions:
 
 ```math
 \operatorname{Var}\left(\frac{S}{\sqrt{d_k}}\right) = \frac{1}{d_k} \operatorname{Var}(S) = \frac{d_k}{d_k} = 1.0
 ```
 
-The dot product distribution remains well-conditioned regardless of dimension size, ensuring healthy gradient flow throughout training!
+This scaling keeps the logits in a more favorable range under the stated variance assumptions, reducing the risk of early Softmax saturation.
 
 ---
 
@@ -368,7 +373,7 @@ The mask is added to the scaled scores **before** applying Softmax:
 A_{\mathrm{causal}} = \operatorname{softmax}\left(\frac{Q K^T}{\sqrt{d_k}} + M\right)
 ```
 
-Because `\lim_{x \to -\infty} \exp(x) = 0`, all future positions become **exactly zero** in the attention matrix:
+Because `\lim_{x \to -\infty} \exp(x) = 0`, all future positions become **mathematically zero** in the attention matrix when using `-np.inf`:
 
 ```math
 A_{\mathrm{causal}} = \begin{bmatrix}
@@ -379,24 +384,32 @@ A_{\mathrm{causal}} = \begin{bmatrix}
 \end{bmatrix}
 ```
 
+> [!NOTE]
+> In our pure NumPy implementation using literal `-np.inf`, masked entries evaluate to exact mathematical zeros (`exp(-inf) == 0.0`). In deep learning frameworks and mixed-precision routines (e.g., FP16), large finite negative constants such as `-1e9` or `-1e4` are commonly substituted to prevent NaN artifacts, yielding numerically negligible weights rather than exact zeros.
+
 ---
 
 ## Multi-Head Attention: Subspace Diversity
 
-Why use multiple attention heads instead of one big attention head?
+### Why use multiple attention heads?
+
+A single head has one learned attention pattern per query position. Multiple heads allow the model to represent different relationships and feature subspaces in parallel.
 
 ```text
 ====================================================================================================
 WHY MULTI-HEAD ATTENTION? (Joint Subspace Focus)
 ====================================================================================================
+Illustrative example: different heads may learn to emphasize different relationships;
+specific specialization is learned and is not guaranteed to follow these categories.
+
 Consider the sentence: "The animal didn't cross the street because it was too tired."
 
 Head 1 (Grammar / Syntax):        "it" ──────── attend ────────► "animal" (Resolves coreference pronoun)
 Head 2 (State / Adjective):       "it" ──────── attend ────────► "tired"  (Connects subject to condition)
 Head 3 (Spatial / Relationship):  "cross" ───── attend ────────► "street" (Connects action to target)
 
-* A single attention head would be forced to average all these relationships together into one vector.
-* Multi-Head Attention allows different heads to focus on entirely different semantic subspaces!
+* A single attention head produces a single attention distribution per position.
+* Multi-Head Attention allows the model to attend to information from different representation subspaces simultaneously.
 ====================================================================================================
 ```
 
@@ -494,7 +507,7 @@ For any fixed temporal distance `k`, the positional encoding at `pos + k` can be
 ```math
 PE_{(pos + k, :)} = PE_{(pos, :)} M_k
 ```
-This allows the attention mechanism to easily learn to attend to **relative positions** (`k` steps ahead or behind), enabling generalization to sequence lengths longer than those observed during training!
+This structure provides a mechanism for representing relative positional offsets and can facilitate extrapolation to sequence positions beyond those seen during training.
 
 ---
 
@@ -534,8 +547,9 @@ Let:
 - `T`: Sequence length.
 - `d_{\mathrm{model}}`: Total model embedding dimension.
 - `h`: Number of parallel attention heads.
-- `d_k = d_{\mathrm{model}} / h`: Query and Key dimension per head.
-- `d_v = d_{\mathrm{model}} / h`: Value dimension per head.
+- `d_k`: Query/Key dimension per head.
+- `d_v`: Value dimension per head.
+- In this implementation, `d_k = d_v = d_{\mathrm{model}} / h`.
 
 | Tensor / Parameter | Shape | Mathematical Symbol | Description |
 | :--- | :--- | :--- | :--- |
@@ -607,7 +621,7 @@ THE ATTENTION REVOLUTION
 │
 ├── 01. Why attention exists: The death of sequential recurrence
 ├── 02. The information bottleneck problem in RNNs/LSTMs
-├── 03. O(T) sequential operations vs O(1) parallel operations
+├── 03. O(T) sequential dependency depth vs O(1) parallel depth
 ├── 04. Maximum path length: O(T) vs O(1) direct shortcuts
 ├── 05. The Vaswani et al. (2017) breakthrough
 ├── 06. Permutation equivariance of pure self-attention (order-agnostic)
@@ -631,7 +645,7 @@ SCALED DOT-PRODUCT ATTENTION
 ├── 16. Matrix multiplication Q @ K.T -> (T, T) similarity matrix
 ├── 17. Variance of dot product: Var(q · k) = d_k
 ├── 18. Why unscaled dot products explode with high dimensions
-├── 19. Softmax gradient saturation & vanishing gradient proof
+├── 19. Softmax gradient saturation risk from large dot-product variance
 ├── 20. The scaling factor: 1 / sqrt(d_k)
 ├── 21. Preserving unit variance: Var(S / sqrt(d_k)) = 1
 │
@@ -660,7 +674,7 @@ CAUSAL & PADDING MASKING
 ▼
 MULTI-HEAD ATTENTION (MHA)
 │
-├── 36. Motivation: Why a single attention head is insufficient
+├── 36. Motivation: Why multiple attention heads are useful
 ├── 37. Representational subspaces (Syntax, Coreference, Logic)
 ├── 38. Splitting d_model into h heads: d_k = d_model / h
 ├── 39. Parallel multi-head computation
