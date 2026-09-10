@@ -403,23 +403,23 @@ For the `"hello"` character model:
 - Batch size: `B = 1`
 - Sequence length: `T = 4` (timesteps: `['h', 'e', 'l', 'l']`)
 - Input feature dimension: `D = 4` (one-hot vector size)
-- Hidden state dimension: `H = 4` (number of recurrent memory neurons)
+- Hidden state dimension: `H = 3` (number of recurrent memory neurons)
 - Output classes: `K = 4` (vocabulary size)
 
 #### Learnable Parameter Budget:
 
 ```text
-W_xh : (D, H) = (4, 4) -> 16 weights
-W_hh : (H, H) = (4, 4) -> 16 weights
-b_h  : (1, H) = (1, 4) ->  4 biases
-W_hy : (H, K) = (4, 4) -> 16 weights
+W_xh : (D, H) = (4, 3) -> 12 weights
+W_hh : (H, H) = (3, 3) ->  9 weights
+b_h  : (1, H) = (1, 3) ->  3 biases
+W_hy : (H, K) = (3, 4) -> 12 weights
 b_y  : (1, K) = (1, 4) ->  4 biases
 ----------------------------------------
-Total learnable parameters = 56 parameters
+Total learnable parameters = 40 parameters
 ```
 
 > [!TIP]
-> A parameter budget of just **56 scalars** allows us to calculate and verify every single weight update, matrix dot product, and BPTT gradient step by hand down to 6 decimal places.
+> A parameter budget of just **40 scalars** allows us to calculate and verify every single weight update, matrix dot product, and BPTT gradient step by hand down to 6 decimal places.
 
 ---
 
@@ -478,192 +478,43 @@ Following the repository's 10-step sequence:
 
 | Step | Status | Evidence |
 | :--- | :--- | :--- |
-| 1. Mathematics | In Progress | `steps/step-01-mathematics.md` (Deriving recurrence, Jacobian tensors, and BPTT) |
-| 2. NumPy implementation | Pending | `src/rnn.py`: vectorized `rnn_cell_forward`, `rnn_forward`, and `dense_output` |
-| 3. Understand forward pass | Pending | Step-by-step tensor tracing across all `T` timesteps |
-| 4. Understand loss | Pending | Sequence-level cross-entropy loss and many-to-one / many-to-many configurations |
-| 5. Derive gradients | Pending | Unrolling computation graph to derive shared parameter gradients |
-| 6. Implement backpropagation | Pending | Full BPTT algorithm with gradient accumulation across time |
-| 7. Train model | Pending | Sequence classification and character-level language modeling |
-| 8. Debug & analyze | Pending | Diagnosing vanishing/exploding gradients; gradient clipping validation |
+| 1. Mathematics | Implemented | `steps/step-01-mathematics.md`: recurrence, tensor shapes, loss, BPTT derivation, and gradient pathology |
+| 2. NumPy implementation | Implemented | `src/rnn.py`: forward pass, BPTT, gradient clipping, SGD, prediction, generation, and gradient checking |
+| 3. Understand forward pass | Implemented | Deterministic `"hell"` walkthrough and cached hidden states across all `T` timesteps |
+| 4. Understand loss | Implemented | Many-to-many sequence cross-entropy for `"hell" -> "ello"` |
+| 5. Derive gradients | Implemented | Output-layer and recurrent-parameter gradients derived in the mathematics step |
+| 6. Implement backpropagation | Implemented | Full BPTT with gradients accumulated over shared parameters |
+| 7. Train model | Implemented | Full-batch training reduces loss and learns the `"hello"` transition sequence |
+| 8. Debug & analyze | Partially implemented | Global-norm clipping and analytical-vs-numerical gradient checking; no separate long-sequence pathology experiment yet |
 | 9. PyTorch implementation | Pending | Equivalent model using `torch.nn.RNN` and `torch.nn.Linear` |
 | 10. Compare results | Pending | Validation of weights, hidden states, loss curves, and runtime |
 
 ---
 
-## Complete 101-Topic Foundational Curriculum
+## Implemented in This Project
 
-This project systematically covers the following 101 core deep learning topics across 17 structured modules:
+The current project implements and verifies a vanilla many-to-many RNN with
+pure NumPy. It includes:
 
-```text
-FOUNDATIONS
-│
-├── 01. Vectors
-├── 02. Matrices
-├── 03. Matrix multiplication
-├── 04. Matrix dimensions / shapes
-├── 05. Transpose
-├── 06. Bias broadcasting
-│
-▼
-DENSE LAYER
-│
-├── 07. Dense layer mathematics
-├── 08. Dense forward pass
-├── 09. Dense layer implementation
-├── 10. Dense backward pass
-├── 11. Derive dW, db, dX
-│
-▼
-ACTIVATION FUNCTIONS
-│
-├── 12. Why activation functions exist
-├── 13. tanh
-├── 14. tanh derivative
-├── 15. ReLU
-├── 16. ReLU derivative
-├── 17. Sigmoid
-├── 18. Sigmoid derivative
-│
-▼
-SEQUENCE FUNDAMENTALS
-│
-├── 19. What is a sequence?
-├── 20. Time steps
-├── 21. Sequence representation
-├── 22. Feature dimension
-├── 23. Batch dimension
-├── 24. Sequence tensor shapes
-│
-▼
-RNN CONCEPTS
-│
-├── 25. What is an RNN?
-├── 26. Hidden state
-├── 27. Recurrent connection
-├── 28. Previous hidden state
-├── 29. Current input
-├── 30. Parameter sharing across time
-│
-▼
-SIMPLE RNN FORWARD
-│
-├── 31. Single RNN cell
-├── 32. RNN equations
-├── 33. Calculate pre-activation z_t
-├── 34. Apply tanh
-├── 35. Calculate h_t
-├── 36. Calculate output
-│
-▼
-RNN SEQUENCE FORWARD
-│
-├── 37. Initialize h₀
-├── 38. Process x₁
-├── 39. Calculate h₁
-├── 40. Process x₂
-├── 41. Calculate h₂
-├── 42. Process x₃
-├── 43. Calculate h₃
-├── 44. Continue for T time steps
-│
-▼
-OUTPUT LAYER
-│
-├── 45. Output Dense layer
-├── 46. Output logits
-├── 47. Softmax
-├── 48. Prediction
-│
-▼
-LOSS
-│
-├── 49. One-hot encoding
-├── 50. Cross-entropy
-├── 51. Sequence loss
-├── 52. Final timestep loss
-├── 53. Loss over multiple timesteps
-│
-▼
-CHAIN RULE
-│
-├── 54. Computational graphs
-├── 55. Partial derivatives
-├── 56. Chain rule
-├── 57. Local gradients
-├── 58. Gradient flow
-│
-▼
-RNN BACKWARD PASS
-│
-├── 59. Output gradient
-├── 60. dL/dy
-├── 61. Softmax + cross-entropy gradient
-├── 62. Gradient through output Dense
-├── 63. Gradient arriving at h_t
-├── 64. Gradient through tanh
-├── 65. Gradient through W_xh
-├── 66. Gradient through W_hh
-├── 67. Gradient through x_t
-├── 68. Gradient through h_{t-1}
-│
-▼
-BPTT (BACKPROPAGATION THROUGH TIME)
-│
-├── 69. Why ordinary backprop isn't enough
-├── 70. Unroll the RNN
-├── 71. Backpropagate from final timestep
-├── 72. Propagate gradient to previous timestep
-├── 73. Continue backward through time
-├── 74. Accumulate gradients
-├── 75. Shared W_xh gradient
-├── 76. Shared W_hh gradient
-├── 77. Shared bias gradient
-│
-▼
-GRADIENT DESCENT
-│
-├── 78. Learning rate
-├── 79. Parameter updates
-├── 80. Update W_xh
-├── 81. Update W_hh
-├── 82. Update b_h
-├── 83. Update W_hy
-├── 84. Update b_y
-│
-▼
-TRAINING LOOP
-│
-├── 85. Initialize parameters
-├── 86. Forward pass
-├── 87. Calculate loss
-├── 88. BPTT
-├── 89. Calculate gradients
-├── 90. Gradient descent
-├── 91. Repeat
-│
-▼
-GRADIENT PROBLEMS
-│
-├── 92. Vanishing gradients
-├── 93. Why tanh causes it
-├── 94. Repeated multiplication through time
-├── 95. Exploding gradients
-├── 96. Gradient clipping
-│
-▼
-VALIDATION
-│
-├── 97. Numerical gradient checking
-├── 98. Finite differences
-├── 99. Compare analytical vs numerical gradients
-├── 100. Debug shape errors
-│
-▼
-FINAL IMPLEMENTATION
-│
-└── 101. Complete Simple RNN from scratch
-```
+- vectors, matrices, matrix multiplication, transposes, tensor shapes, and bias broadcasting
+- input-to-hidden, hidden-to-hidden, and hidden-to-output dense projections
+- `tanh` hidden activation and its derivative
+- one-hot character inputs, batch dimensions, timesteps, and shared parameters across time
+- a complete forward pass: hidden states, logits, stable softmax, predictions, and sequence cross-entropy
+- BPTT: output gradients, gradients through `tanh`, recurrent gradient flow, and accumulated shared-parameter gradients
+- global-norm gradient clipping, gradient-descent updates, and a repeatable training loop
+- teacher-forced prediction, autoregressive generation, and numerical gradient checking with finite differences
+
+## Planned Extensions
+
+These are intentionally outside the current Simple-RNN implementation:
+
+- ReLU and sigmoid activation lessons and their derivatives
+- many-to-one/final-timestep-only loss configuration
+- explicit gradients with respect to the input sequence, `dL/dx_t`
+- a numerical long-sequence experiment for vanishing and exploding gradients
+- a PyTorch implementation using `torch.nn.RNN`
+- a NumPy-versus-PyTorch comparison of results and runtime
 
 ---
 
@@ -678,5 +529,7 @@ FINAL IMPLEMENTATION
 
 ## Next Steps
 
-1. Build [`steps/step-01-mathematics.md`](file:///Users/pasan/Documents/Personal/deep-learning-foundations/07-rnn-from-scratch/steps/step-01-mathematics.md) with rigorous mathematical derivations and matrix calculus for the Simple RNN forward pass, activation functions (`tanh`), and BPTT.
-2. Implement pure NumPy forward pass and unrolled sequence processing in [`src/rnn.py`](file:///Users/pasan/Documents/Personal/deep-learning-foundations/07-rnn-from-scratch/src/rnn.py).
+1. Add the planned activation-function and final-timestep-loss lessons.
+2. Implement and verify explicit input gradients, `dL/dx_t`.
+3. Create a long-sequence experiment that measures vanishing and exploding gradients.
+4. Build the equivalent PyTorch RNN and compare outputs, training curves, and runtime.
