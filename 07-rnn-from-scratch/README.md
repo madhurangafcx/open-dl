@@ -29,65 +29,20 @@ o_t = h_t W_{hy} + b_y
 Where:
 - `x_t`: Input vector at timestep `t`.
 - `h_{t-1}`: Hidden state vector from previous timestep `t-1` (memory context).
-- `W_xh`: Input-to-hidden weight matrix.
-- `W_hh`: Hidden-to-hidden recurrent weight matrix (shared across all timesteps).
+- `W_{xh}`: Input-to-hidden weight matrix.
+- `W_{hh}`: Hidden-to-hidden recurrent weight matrix (shared across all timesteps).
 - `b_h`: Hidden bias vector.
 - `h_t`: Updated hidden state vector at timestep `t`.
-- `W_hy`: Hidden-to-output projection weight matrix.
+- `W_{hy}`: Hidden-to-output projection weight matrix.
 - `b_y`: Output bias vector.
 - `o_t`: Unnormalized output logits at timestep `t`.
-- `y_t`: Normalized categorical probability distribution over classes.
+- `\hat{y}_t`: Normalized categorical probability distribution over classes.
 
 ---
 
 ## Why Do We Need RNNs?
 
-Before understanding RNNs, we must analyze the two fundamental limitations of traditional feedforward **Artificial Neural Networks (ANNs)**:
-1. **High-dimensional spatial data** (addressed by CNNs).
-2. **Sequential and temporal data** (addressed by RNNs).
-
----
-
-### Problem 1 — Traditional ANNs on High-Dimensional Spatial Data
-
-Traditional fully connected ANNs connect every input feature to every neuron in subsequent layers.
-This breaks down on high-dimensional perception data (images, video, spectrograms).
-
-#### Example: Image Recognition
-Consider an RGB image of size `249 × 248`:
-
-```text
-Total input features = 249 × 248 × 3 = 185,256 pixels
-```
-
-Connecting this input image to a modest first hidden layer of 128 neurons requires:
-
-```text
-Weights = 185,256 × 128 = 23,712,768 parameters (~23.7 million weights)
-```
-
-This causes severe structural issues:
-- **Parameter explosion**: Millions of parameters for a single layer.
-- **Memory & compute exhaustion**: High memory footprint and slow convergence.
-- **Overfitting**: High parameter capacity memorizes noise instead of general patterns.
-- **Destruction of 2D topology**: Flattening pixels destroys spatial locality and translation invariance.
-
-#### The Solution: Convolutional Neural Networks (CNNs)
-For spatial data, CNNs exploit:
-- **Spatial locality**: Neurons connect only to small local receptive fields (e.g. 3 × 3).
-- **Weight sharing**: The same kernel slides across the entire image.
-- **Hierarchical feature extraction**: Low-level edges -> textures -> shapes -> object parts -> semantic classification.
-
-```text
-Image ──► Conv2D ──► Local Features ──► Pooling / Striding ──► Hierarchical Representation ──► Classification
-```
-
-> [!NOTE]
-> CNNs do not merely compress dimensions; they perform feature extraction while downsampling spatial grids.
-
----
-
-### Problem 2 — Traditional ANNs Cannot Handle Sequential Data
+### Traditional ANNs Cannot Handle Sequential Data
 
 A traditional feedforward ANN processes inputs independently:
 
@@ -134,11 +89,6 @@ x₁ ──► x₂ ──► x₃ ──► x₄ ──► ... ──► xₜ
    Continuous acoustic waveforms vary dynamically across time:
    ```text
    audio₁ ──► audio₂ ──► audio₃ ──► ... ──► audioₜ ──► Transcribed Text
-   ```
-6. **Image Captioning (Vision + Sequence)**:
-   Combines a CNN visual encoder with an RNN sequential language decoder:
-   ```text
-   Image ──► CNN Encoder ──► Visual Features ──► RNN Decoder ──► "A" ──► "A dog" ──► "A dog is running"
    ```
 
 ---
@@ -266,7 +216,7 @@ y_t         y_{t+1}        y_{t+2}
 
 ## Sequence Topologies: The 5 Fundamental RNN Patterns
 
-In feedforward neural networks (ANN and CNN), models map a single fixed-size input vector to a single fixed-size output vector (One-to-One).
+In traditional feedforward neural networks (ANNs), models map a single fixed-size input vector to a single fixed-size output vector (One-to-One).
 In recurrent neural networks, inputs and outputs can be variable-length sequences, giving rise to **5 distinct sequence topologies**:
 
 ```text
@@ -306,7 +256,7 @@ In recurrent neural networks, inputs and outputs can be variable-length sequence
 
 | Topology | Input Size | Output Size | Loss Computation | Real-World Application | Used in Project 07? |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **1. One-to-One** | Single `(1, D)` | Single `(1, K)` | Standard loss: `L = loss(y, ŷ)` | Traditional tabular classification, image classification (ANN/CNN) | No (Baseline) |
+| **1. One-to-One** | Single `(1, D)` | Single `(1, K)` | Standard loss: `L = loss(y, ŷ)` | Traditional tabular or vector classification (ANN baseline) | No (Baseline) |
 | **2. One-to-Many** | Single `(1, D)` | Sequence `(T_y, K)` | Sum over output steps: `L = sum_t loss(y_t, ŷ_t)` | Image Captioning (Image -> sequence of words), Music generation | No |
 | **3. Many-to-One** | Sequence `(T_x, D)` | Single `(1, K)` | Computed only at final step: `L = loss(y_T, ŷ_T)` | Sentiment Analysis (Sentence -> Positive/Negative), Action recognition from video | Dedicated to `08-sentiment-rnn` |
 | **4. Many-to-Many (Synchronous)** | Sequence `(T, D)` | Sequence `(T, K)` (Same Length `T`) | Sum over all timesteps: `L = sum_t loss(y_t, ŷ_t)` | **Character-Level Language Modeling**, Part-of-Speech tagging, Video frame classification | **Yes (Chosen for Project 07)** |
@@ -463,7 +413,7 @@ For a batch of sequences processed by a Simple RNN:
 
 ```text
 07-rnn-from-scratch/
-├── README.md                 # Architecture overview, intuition, and 101-topic syllabus
+├── README.md                 # Architecture overview, intuition, and implementation guide
 ├── src/
 │   └── rnn.py                # Pure NumPy RNN cell, forward loop, BPTT, and training
 └── steps/
