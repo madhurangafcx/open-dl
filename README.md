@@ -102,22 +102,22 @@ deep-learning-foundations/
 
 ### Part 1: Neurons & Multi-Layer Perceptrons (Dense Architectures)
 
-#### [01 — Single Neuron](file:///Users/pasan/Documents/Personal/deep-learning-foundations/01-neuron/README.md)
+#### [01 — Single Neuron](01-neuron/README.md)
 - **Problem**: Binary linear classification (AND, OR logic gates) and the limits of linear separation.
-- **Key Concepts**: Weighted sum `z = X @ w + b`, logistic Sigmoid activation, logit space, Binary Cross-Entropy (BCE) loss, scalar and vectorized gradient descent.
+- **Key Concepts**: Weighted sum $z = X w + b$, logistic Sigmoid activation, logit space, Binary Cross-Entropy (BCE) loss, scalar and vectorized gradient descent.
 - **Why It Matters**: Proves that a single linear hyperplane cannot separate non-linear data (the famous Minsky & Papert XOR limitation).
 
-#### [02 — ANN From Scratch](file:///Users/pasan/Documents/Personal/deep-learning-foundations/02-ann-from-scratch/README.md)
+#### [02 — ANN From Scratch](02-ann-from-scratch/README.md)
 - **Problem**: Solving the non-linear XOR classification problem that defeated the single neuron.
-- **Key Concepts**: Hidden layer feature transformation, ReLU activation, Softmax normalization, Categorical Cross-Entropy, 2-layer backpropagation matrix calculus (`dW2, db2, dW1, db1`).
+- **Key Concepts**: Hidden layer feature transformation, ReLU activation, Softmax normalization, Categorical Cross-Entropy, 2-layer backpropagation matrix calculus ($dW_2, db_2, dW_1, db_1$).
 - **Why It Matters**: Demonstrates how non-linear hidden representations fold feature space to make non-linearly separable problems linearly separable.
 
-#### [03 — MNIST ANN](file:///Users/pasan/Documents/Personal/deep-learning-foundations/03-mnist-ann/README.md)
+#### [03 — MNIST ANN](03-mnist-ann/README.md)
 - **Problem**: Classifying 28 × 28 grayscale handwritten digits (0–9) on the classic MNIST dataset.
 - **Key Concepts**: High-dimensional vector flattening (784 inputs), mini-batch gradient descent, Xavier/He weight initialization, learning rate annealing, multi-class evaluation metrics.
 - **Why It Matters**: Transitions from 2D toy coordinates to high-dimensional real-world image classification with deep multi-layer perceptrons.
 
-#### [04 — Customer Churn Classification](file:///Users/pasan/Documents/Personal/deep-learning-foundations/04-customer-churn/README.md)
+#### [04 — Customer Churn Classification](04-customer-churn/README.md)
 - **Problem**: Predicting enterprise customer churn on tabular business data.
 - **Key Concepts**: Tabular preprocessing, one-hot categorical encoding, numerical standard scaling, addressing severe class imbalance (weighted cross-entropy, focal loss), Precision, Recall, ROC-AUC.
 - **Why It Matters**: Bridges machine learning theory to industry tabular deep learning workflows.
@@ -126,12 +126,13 @@ deep-learning-foundations/
 
 ### Part 2: Spatial Representation Learning (Convolutional Neural Networks)
 
-#### [05 — CNN From Scratch](file:///Users/pasan/Documents/Personal/deep-learning-foundations/05-cnn-from-scratch/README.md)
+#### [05 — CNN From Scratch](05-cnn-from-scratch/README.md)
 - **Problem**: Overcoming the parameter explosion and spatial destruction of ANNs on 2D images.
-- **Key Concepts**: 2D discrete convolution vs cross-correlation, receptive fields, parameter sharing, translation equivariance, multi-channel 4D tensors `(B, C, H, W)`, stride arithmetic, valid vs same zero-padding, the complete **Pooling Suite** (Max, Min, and Average Pooling), spatial backpropagation with rotated kernels (`rot180`).
+- **Key Concepts**: 2D discrete convolution vs cross-correlation, receptive fields, parameter sharing, translation equivariance, multi-channel 4D tensors $(B, C, H, W)$, stride arithmetic, valid vs same zero-padding, the complete **Pooling Suite** (Max, Min, and Average Pooling), spatial backpropagation with rotated kernels (`rot180`).
+- **Implementation**: Available in [`05-cnn-from-scratch/src/cnn.py`](05-cnn-from-scratch/src/cnn.py) with full derivations in [`05-cnn-from-scratch/steps/step-01-mathematics.md`](05-cnn-from-scratch/steps/step-01-mathematics.md).
 - **Why It Matters**: The foundational mathematical engine powering all modern computer vision.
 
-#### [06 — Traffic Sign Recognition CNN](file:///Users/pasan/Documents/Personal/deep-learning-foundations/06-traffic-sign-cnn/README.md)
+#### [06 — Traffic Sign Recognition CNN](06-traffic-sign-cnn/README.md)
 - **Problem**: Multi-class visual classification on real-world German Traffic Sign Recognition Benchmark (GTSRB).
 - **Key Concepts**: Deep convolutional hierarchies (edges -> textures -> shapes -> signs), data augmentation (rotation, jitter, scaling), dropout regularization, batch normalization.
 - **Why It Matters**: Real-world safety-critical autonomous driving vision using convolutional networks.
@@ -140,46 +141,50 @@ deep-learning-foundations/
 
 ### Part 3: Sequential & Temporal Representation Learning (Recurrent Architectures)
 
-#### [07 — RNN From Scratch](file:///Users/pasan/Documents/Personal/deep-learning-foundations/07-rnn-from-scratch/README.md)
+#### [07 — RNN From Scratch](07-rnn-from-scratch/README.md)
 - **Problem**: Modeling sequential data where temporal order dictates meaning; resolving the **Collision Paradox** (`'l' -> 'l'` vs `'l' -> 'o'` on identical inputs).
-- **Key Concepts**: Recurrent hidden state memory `h_t = \tanh(x_t W_{xh} + h_{t-1} W_{hh} + b_h)`, parameter sharing across time, unrolling the computational graph, Backpropagation Through Time (BPTT), sequence categorical cross-entropy, character-level language modeling on `"hello"`.
-- **Mathematical Blueprint**: Detailed in [`07-rnn-from-scratch/steps/step-01-mathematics.md`](file:///Users/pasan/Documents/Personal/deep-learning-foundations/07-rnn-from-scratch/steps/step-01-mathematics.md).
+- **Key Concepts**: Recurrent hidden state memory $h_t = \tanh(x_t W_{xh} + h_{t-1} W_{hh} + b_h)$, parameter sharing across time, unrolling the computational graph, Backpropagation Through Time (BPTT), sequence categorical cross-entropy, character-level language modeling on `"hello"`.
+- **Implementation**: Available in [`07-rnn-from-scratch/src/rnn.py`](07-rnn-from-scratch/src/rnn.py) with full derivations in [`07-rnn-from-scratch/steps/step-01-mathematics.md`](07-rnn-from-scratch/steps/step-01-mathematics.md).
 
-#### [08 — Sentiment Analysis with RNN](file:///Users/pasan/Documents/Personal/deep-learning-foundations/08-sentiment-rnn/README.md)
+#### [08 — Sentiment Analysis with RNN](08-sentiment-rnn/README.md)
 - **Problem**: Natural language sentiment classification on variable-length text sentences; resolving negation flipping (`"not good"` vs `"good"`).
-- **Key Concepts**: Text normalization, word tokenization, vocabulary mapping (`<PAD>=0`, `<UNK>=1`), dense word embeddings (`E`), sequence padding & truncation, dynamic length indexing, hidden state masking, **Many-to-One** sequence topology, terminal BCE loss.
+- **Key Concepts**: Text normalization, word tokenization, vocabulary mapping (`<PAD>=0`, `<UNK>=1`), dense word embeddings ($E$), sequence padding & truncation, dynamic length indexing, hidden state masking, **Many-to-One** sequence topology, terminal BCE loss.
+- **Implementation**: Available in [`08-sentiment-rnn/src/sentiment_rnn.py`](08-sentiment-rnn/src/sentiment_rnn.py) with full derivations in [`08-sentiment-rnn/steps/step-01-mathematics.md`](08-sentiment-rnn/steps/step-01-mathematics.md).
 - **Why It Matters**: The bridge from character-level toy transitions to real-world natural language processing.
 
-#### [09 — Long Short-Term Memory (LSTM)](file:///Users/pasan/Documents/Personal/deep-learning-foundations/09-lstm/README.md)
-- **Problem**: Resolving the catastrophic vanishing gradient failure of simple RNNs over long sequences (`T > 10`).
-- **Key Concepts**: Two-track memory system (Long-Term Cell State `C_t` and Working Hidden State `h_t`), mathematical proof of the **Constant Error Carousel (CEC)**, Forget Gate (`f_t`), Input Gate (`i_t`), Candidate (`\tilde{C}_t`), Output Gate (`o_t`), fused 4-gate matrix vectorization `W_x \in R^(D x 4H)`.
-- **Why It Matters**: The breakthrough architecture that unlocked speech recognition, translation, and long sequence modeling.
+#### [09 — Long Short-Term Memory (LSTM)](09-lstm/README.md)
+- **Problem**: Resolving the catastrophic vanishing gradient failure of simple RNNs over extended sequences ($T > 10$).
+- **Key Concepts**: Two-track dynamical memory (Long-Term Cell State $C_t$ and Working Hidden State $h_t$), mathematical proof of the **Constant Error Carousel (CEC)**, Forget Gate ($f_t$), Input Gate ($i_t$), Candidate State ($\tilde{C}_t$), Output Gate ($o_t$), fused 4-gate matrix vectorization $W_x \in \mathbb{R}^{D \times 4H}$, long-range bit memory benchmark ($T = 20$: RNN 53.3% vs. LSTM 100.0%).
+- **Implementation**: Available in [`09-lstm/src/lstm.py`](09-lstm/src/lstm.py) with full derivations in [`09-lstm/steps/step-01-mathematics.md`](09-lstm/steps/step-01-mathematics.md).
+- **Why It Matters**: The breakthrough architecture that unlocked speech recognition, translation, and modern sequence modeling.
 
-#### [10 — Gated Recurrent Unit (GRU)](file:///Users/pasan/Documents/Personal/deep-learning-foundations/10-gru/README.md)
+#### [10 — Gated Recurrent Unit (GRU)](10-gru/README.md)
 - **Problem**: Reducing the computational and parameter overhead of LSTMs while retaining vanishing gradient immunity.
-- **Key Concepts**: Streamlined single hidden state (`h_t`), coupled gating (Reset Gate `r_t` and Update Gate `z_t`), linear state interpolation highway `(1 - z_t) \odot h_{t-1} + z_t \odot \tilde{h}_t`, Cho et al. vs PyTorch double-bias conventions, comprehensive 3-way benchmark comparison (RNN vs LSTM vs GRU).
+- **Key Concepts**: Reset-before Cho et al. (2014) formulation, single hidden state ($h_t$), coupled gating (Reset Gate $r_t$ and Update Gate $z_t$), the linear state interpolation gradient highway $h_t = (1 - z_t) \odot h_{t-1} + z_t \odot \tilde{h}_t$, 4-way BPTT error propagation, batch-mean gradient scaling, and deterministic memory benchmarking.
+- **Implementation**: Available in [`10-gru/src/gru.py`](10-gru/src/gru.py) with full derivations in [`10-gru/steps/step-01-mathematics.md`](10-gru/steps/step-01-mathematics.md).
 - **Why It Matters**: 25% fewer parameters, faster training, smaller memory footprint, and competitive or superior performance on small-to-medium corpora.
 
-#### [11 — Sequence Prediction & Autoregressive Modeling](file:///Users/pasan/Documents/Personal/deep-learning-foundations/11-sequence-prediction/README.md)
+#### [11 — Sequence Prediction & Autoregressive Modeling](11-sequence-prediction/README.md)
 - **Problem**: Learning the universal generative objective underlying all modern Large Language Models: Next-Token Prediction under the probabilistic chain rule.
-- **Key Concepts**: Causal sequence shifting (`Y = X` shifted by 1), **Teacher Forcing**, Exposure Bias, autoregressive inference loops, decoding strategies (**Greedy Argmax, Temperature Scaling, Top-K, Top-P Nucleus Sampling**), Perplexity metric (`PPL = exp(mean_loss)`).
+- **Key Concepts**: Causal sequence shifting topology ($Y = X$ shifted by $+1$), dense vocabulary embedding matrix $E$ with sparse BPTT accumulation (`np.add.at`), Teacher Forcing vs. free-running inference, complete decoding suite (**Greedy Argmax, Temperature Scaling, Top-K, Top-P Nucleus Sampling**), Perplexity evaluation metric ($\text{PPL} = \exp(\bar{L})$).
+- **Implementation**: Available in [`11-sequence-prediction/src/sequence_model.py`](11-sequence-prediction/src/sequence_model.py) with full derivations in [`11-sequence-prediction/steps/step-01-mathematics.md`](11-sequence-prediction/steps/step-01-mathematics.md).
 - **Why It Matters**: The exact pre-training and generation mechanics used by GPT, Claude, and Gemini.
 
 ---
 
 ### Part 4: Attention & The Modern Transformer Revolution
 
-#### [12 — Attention Mechanisms](file:///Users/pasan/Documents/Personal/deep-learning-foundations/12-attention/README.md)
+#### [12 — Attention Mechanisms](12-attention/README.md)
 - **Problem**: Eliminating the fixed-vector information bottleneck of recurrent encoder-decoder models.
-- **Key Concepts**: Bahdanau additive attention, Luong multiplicative dot-product attention, Query-Key-Value (`Q, K, V`) formulations, dynamic alignment scores, attention weight heatmaps, context vector computation `c_i = \sum \alpha_{ij} h_j`.
+- **Key Concepts**: Bahdanau additive attention, Luong multiplicative dot-product attention, Query-Key-Value ($Q, K, V$) formulations, dynamic alignment scores, attention weight heatmaps, context vector computation $c_i = \sum \alpha_{ij} h_j$.
 - **Why It Matters**: The conceptual foundation that paved the way for Transformers by replacing recurrent memory with direct associative retrieval.
 
-#### [13 — Mini-Transformer](file:///Users/pasan/Documents/Personal/deep-learning-foundations/13-mini-transformer/README.md)
-- **Problem**: Abolishing recurrent sequential bottlenecks to allow massive `O(1)` parallel sequence training across time.
+#### [13 — Mini-Transformer](13-mini-transformer/README.md)
+- **Problem**: Abolishing recurrent sequential bottlenecks to allow massive $O(1)$ parallel sequence training across time.
 - **Key Concepts**: Scaled Dot-Product Attention, Multi-Head Attention (MHA), Sinusoidal Positional Encoding, Layer Normalization (Pre-LN vs Post-LN), Residual Connections, Position-wise Feed-Forward Networks (FFN).
 - **Why It Matters**: First-principles implementation of the definitive architecture defined in *"Attention Is All You Need"* (Vaswani et al., 2017).
 
-#### [14 — Mini-LLM (Decoder-Only GPT)](file:///Users/pasan/Documents/Personal/deep-learning-foundations/14-mini-llm/README.md)
+#### [14 — Mini-LLM (Decoder-Only GPT)](14-mini-llm/README.md)
 - **Problem**: Building a complete, standalone generative Large Language Model from scratch.
 - **Key Concepts**: Decoder-only architecture, causal self-attention masking (preventing future token leakage), pre-training on natural text, prompt generation engine, Key-Value (KV) caching for fast autoregressive inference.
 - **Why It Matters**: The capstone project synthesizing all 14 stages into a functioning, miniature generative language model.
@@ -189,7 +194,7 @@ deep-learning-foundations/
 ## Special & Foundational Reference Assets
 
 ### 1. Simple MNIST NN From Scratch
-**Location**: [`Simple MNIST NN from scratch/`](file:///Users/pasan/Documents/Personal/deep-learning-foundations/Simple%20MNIST%20NN%20from%20scratch/)
+**Location**: [`Simple MNIST NN from scratch/`](Simple%20MNIST%20NN%20from%20scratch/)
 
 A self-contained, interactive Jupyter notebook (`simple-mnist-nn-from-scratch-numpy-no-tf-keras.ipynb`) providing a visual, end-to-end implementation of a 2-layer neural network trained on the MNIST handwritten digit dataset directly with pure NumPy:
 
@@ -218,7 +223,7 @@ Input Layer A[0] (784 features) ──► Hidden Layer A[1] (10 neurons, ReLU) �
 ---
 
 ### 2. Transformer Architecture Reference Papers & Diagrams
-**Location**: [`Transformer Arch/`](file:///Users/pasan/Documents/Personal/deep-learning-foundations/Transformer%20Arch/)
+**Location**: [`Transformer Arch/`](Transformer%20Arch/)
 
 This directory preserves the foundational research papers and visual engineering guides that define the theoretical blueprint for Projects 12, 13, and 14:
 
@@ -236,7 +241,7 @@ This directory preserves the foundational research papers and visual engineering
      - Exact tensor transformations through the Encoder and Decoder stacks.
      - Multi-Head Attention splitting, scaling, and concatenation pathways.
      - Additive residual connections and LayerNorm stabilization.
-     - Feed-forward projection expansions (`d_model \to d_{ff} \to d_model`).
+     - Feed-forward projection expansions ($d_{\text{model}} \to d_{ff} \to d_{\text{model}}$).
 
 ---
 
@@ -247,13 +252,13 @@ This directory preserves the foundational research papers and visual engineering
 | **Single Neuron** | `01` | Scalar weighted sum + activation | Hand-crafted rules | First step in learning parameters from data |
 | **Multi-Layer ANN** | `02`, `03`, `04` | Non-linear hidden layers + backprop | Single Neuron | Solves non-linear XOR and complex boundaries |
 | **CNN** | `05`, `06` | Receptive fields + parameter sharing | ANN on images | Solves parameter explosion and spatial destruction |
-| **Simple RNN** | `07` | Recurrent hidden state `h_t` | ANN on sequences | Retains temporal order; solves sequential collision |
+| **Simple RNN** | `07` | Recurrent hidden state $h_t$ | ANN on sequences | Retains temporal order; solves sequential collision |
 | **Sentiment RNN** | `08` | Word embeddings + Many-to-One | Bag-of-Words | Solves negation inversion and one-hot sparsity |
-| **LSTM** | `09` | Constant Error Carousel (`C_t`) + 3 gates | Simple RNN | Solves vanishing gradient over long sequences (`T > 10`) |
-| **GRU** | `10` | Coupled gating + single state (`h_t`) | LSTM | 25% fewer parameters; faster training and lower memory |
+| **LSTM** | `09` | Constant Error Carousel ($C_t$) + 3 gates | Simple RNN | Solves vanishing gradient over long sequences ($T > 10$) |
+| **GRU** | `10` | Coupled gating + single state ($h_t$) | LSTM | 25% fewer parameters; faster training and lower memory |
 | **Autoregressive LM** | `11` | Causal shifting + Teacher Forcing | N-gram models | Predicts probability of any arbitrary word sequence |
-| **Attention** | `12` | Associative `Q, K, V` alignment | Fixed-vector bottleneck | Direct `O(1)` memory access across long sequences |
-| **Transformer** | `13` | Multi-Head Self-Attention + PosEnc | Recurrent models | Unlocks `O(1)` parallel training across time |
+| **Attention** | `12` | Associative $Q, K, V$ alignment | Fixed-vector bottleneck | Direct $O(1)$ memory access across long sequences |
+| **Transformer** | `13` | Multi-Head Self-Attention + PosEnc | Recurrent models | Unlocks $O(1)$ parallel training across time |
 | **Decoder-Only LLM** | `14` | Causal masked self-attention + KV cache | Autoregressive RNNs | Scalable foundation of modern generative AI |
 
 ---
@@ -282,10 +287,27 @@ pip install numpy matplotlib torch
 ```
 
 ### Running Verification Tests
-Every project contains self-contained executable assertion tests. For example, to verify the Simple RNN forward pass and BPTT matrix calculus:
+
+Every completed project contains self-contained executable assertion tests validating forward passes, loss computations, and BPTT matrix calculus against analytical and finite-difference derivations:
 
 ```bash
-python 07-rnn-from-scratch/src/rnn.py
+# Verify 2D Convolution & Pooling Suite
+python3 05-cnn-from-scratch/src/cnn.py
+
+# Verify Simple RNN on "hello" Next-Char Prediction
+python3 07-rnn-from-scratch/src/rnn.py
+
+# Verify Sentiment RNN Many-to-One Classification
+python3 08-sentiment-rnn/src/sentiment_rnn.py
+
+# Verify LSTM from Scratch & Constant Error Carousel (CEC)
+python3 09-lstm/src/lstm.py
+
+# Verify GRU from Scratch & Linear Gradient Highway
+python3 10-gru/src/gru.py
+
+# Verify Autoregressive Sequence Model & Sampling Suite
+python3 11-sequence-prediction/src/sequence_model.py
 ```
 
 To run the interactive standalone MNIST notebook:
@@ -308,10 +330,10 @@ Across all documents in this repository, mathematical notation strictly adheres 
 | `H` | Hidden state capacity / Number of recurrent neurons | Scalar (`H = 3` or `H = 128`) |
 | `V` | Vocabulary size | Scalar (`V = 20` or `V = 10,000`) |
 | `K` | Number of output classification classes | Scalar (`K = 2` or `K = 10`) |
-| `\odot` | Element-wise Hadamard matrix product | `A \odot B` |
-| `@` | Matrix dot product multiplication | `X @ W` |
-| `\sigma(z)` | Logistic Sigmoid function `1 / (1 + exp(-z))` | Range `(0, 1)` |
-| `\tanh(z)` | Hyperbolic Tangent function `(exp(z) - exp(-z)) / (exp(z) + exp(-z))` | Range `(-1, +1)` |
+| `\odot` | Element-wise Hadamard matrix product | $A \odot B$ |
+| `@` | Matrix dot product multiplication | $X @ W$ |
+| `\sigma(z)` | Logistic Sigmoid function $1 / (1 + \exp(-z))$ | Range $(0, 1)$ |
+| `\tanh(z)` | Hyperbolic Tangent function $(\exp(z) - \exp(-z)) / (\exp(z) + \exp(-z))$ | Range $(-1, +1)$ |
 
 ---
 
