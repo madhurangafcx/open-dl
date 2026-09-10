@@ -407,192 +407,16 @@ Following the repository's established 10-step sequence:
 
 | Step | Status | Evidence / Milestone |
 | :--- | :--- | :--- |
-| **1. Mathematics** | Pending | `steps/step-01-mathematics.md`: Additive highway proof, gate equations, BPTT matrix calculus |
-| **2. NumPy Implementation** | Pending | `src/lstm.py`: Vectorized fused gates, `lstm_cell_forward`, `lstm_forward`, `bptt` |
-| **3. Understand Forward Pass** | Pending | Tracing state evolution of `C_t` and `h_t` across all timesteps |
-| **4. Understand Loss** | Pending | Cross-entropy and sequence-level classification loss |
-| **5. Derive Gradients** | Pending | Complete multivariate calculus for 4 gate errors and additive cell backpropagation |
-| **6. Implement Backpropagation** | Pending | Vectorized BPTT accumulating fused weight gradients `dW_x, dW_h, db` |
-| **7. Train Model** | Pending | Training on long-range temporal dependencies (`T >= 20`) |
-| **8. Debug & Analyze** | Pending | Gate saturation analysis, forget gate bias initialization (`b_f = 1.0`) |
+| **1. Mathematics** | Completed | [`steps/step-01-mathematics.md`](file:///Users/pasan/Documents/Personal/deep-learning-foundations/09-lstm/steps/step-01-mathematics.md): Additive highway proof, gate equations, BPTT matrix calculus |
+| **2. NumPy Implementation** | Completed | [`src/lstm.py`](file:///Users/pasan/Documents/Personal/deep-learning-foundations/09-lstm/src/lstm.py): Vectorized fused gates, `lstm_cell_forward`, `lstm_forward`, `lstm_backward` |
+| **3. Understand Forward Pass** | Completed | Tracing state evolution of `C_t` and `h_t` across all timesteps with verified test assertions |
+| **4. Understand Loss** | Completed | Categorical cross-entropy and sequence loss ($L_{\mathrm{seq}} = 1.928327$) |
+| **5. Derive Gradients** | Completed | Complete multivariate calculus for 4 gate errors and additive cell backpropagation |
+| **6. Implement Backpropagation** | Completed | Vectorized BPTT accumulating fused weight gradients `dW_x, dW_h, db` verified with finite difference ($< 10^{-9}$ rel error) |
+| **7. Train Model** | Completed | Training on long-range temporal dependencies ($T = 20$), achieving 100% terminal accuracy |
+| **8. Debug & Analyze** | Completed | Gate inspection and forget gate bias initialization ($b_f = 1.0$) proving Constant Error Carousel (CEC) superiority over Simple RNN |
 | **9. PyTorch Implementation** | Pending | Equivalent implementation using `torch.nn.LSTM` and parameter tensor matching |
 | **10. Compare Results** | Pending | Direct validation of loss curves, state trajectories, and gradient norms |
-
----
-
-## Complete 101-Topic Foundational Curriculum
-
-This project systematically covers the following 101 core deep learning topics across 16 structured modules:
-
-```text
-RNN LIMITATIONS & MOTIVATION
-│
-├── 01. Review of Simple RNN recurrence
-├── 02. The vanishing gradient problem in deep time
-├── 03. The exploding gradient problem
-├── 04. Mathematical proof of vanishing gradients
-├── 05. Repeated Jacobian matrix products
-├── 06. Eigendecomposition of recurrent weights
-├── 07. tanh saturation dynamics
-├── 08. The temporal amnesia horizon (T > 10)
-│
-▼
-THE LSTM PARADIGM SHIFT
-│
-├── 09. Hochreiter & Schmidhuber (1997) breakthrough
-├── 10. The core philosophy: Gated memory routing
-├── 11. Decoupling working memory from long-term memory
-├── 12. The Cell State (C_t): The conveyor belt of memory
-├── 13. The Hidden State (h_t): Filtered working memory
-├── 14. Additive updates vs multiplicative updates
-├── 15. The Constant Error Carousel (CEC) proof
-│
-▼
-ACTIVATION FUNCTIONS IN GATING
-│
-├── 16. The Sigmoid activation function sigma(z)
-├── 17. Why Sigmoid for gates (soft binary switches 0 to 1)
-├── 18. Sigmoid derivative: sigma'(z) = sigma(z) * (1 - sigma(z))
-├── 19. The tanh activation function
-├── 20. Why tanh for state candidates (zero-centered, bounded -1 to +1)
-├── 21. tanh derivative: tanh'(z) = 1 - tanh^2(z)
-│
-▼
-GATE 1: THE FORGET GATE
-│
-├── 22. Forget gate intuition: When to erase memory
-├── 23. Mathematical formula: f_t = sigma(x_t W_xf + h_{t-1} W_{hf} + b_f)
-├── 24. Interpretation of f_t = 0 (complete purge)
-├── 25. Interpretation of f_t = 1 (complete retention)
-├── 26. The forget gate bias initialization trick (b_f = 1.0 or 2.0)
-│
-▼
-GATE 2: THE INPUT GATE & CANDIDATE
-│
-├── 27. Input gate intuition: When to write new information
-├── 28. Candidate cell state: C~_t = tanh(x_t W_xc + h_{t-1} W_{hc} + b_c)
-├── 29. Input gate formula: i_t = sigma(x_t W_xi + h_{t-1} W_{hi} + b_i)
-├── 30. Modulated candidate information: i_t * C~_t
-│
-▼
-CELL STATE FUSION
-│
-├── 31. The fundamental additive state equation
-├── 32. C_t = f_t * C_{t-1} + i_t * C~_t
-├── 33. Element-wise Hadamard product mechanics
-├── 34. Linear gradient highway preservation
-│
-▼
-GATE 3: THE OUTPUT GATE & HIDDEN EMISSION
-│
-├── 35. Output gate intuition: When to emit memory
-├── 36. Output gate formula: o_t = sigma(x_t W_xo + h_{t-1} W_{ho} + b_o)
-├── 37. Non-linear cell state projection: tanh(C_t)
-├── 38. Emitting the hidden state: h_t = o_t * tanh(C_t)
-├── 39. Difference between C_t (internal) and h_t (external)
-│
-▼
-UNROLLED COMPUTATION GRAPH
-│
-├── 40. Single LSTM cell architecture diagram
-├── 41. Unrolling the LSTM over T timesteps
-├── 42. Dual state initialization (h_0 = 0, C_0 = 0)
-├── 43. Step-by-step tensor tracing at t=1
-├── 44. Step-by-step tensor tracing at t=2
-├── 45. Step-by-step tensor tracing at t=T
-│
-▼
-VECTORIZED FUSED IMPLEMENTATION
-│
-├── 46. Naive 4-matrix multiplication overhead
-├── 47. Fusing input weights W_x in R^(D x 4H)
-├── 48. Fusing recurrent weights W_h in R^(H x 4H)
-├── 49. Fusing bias vectors b in R^(1 x 4H)
-├── 50. The fused forward projection: Z = x @ W_x + h_prev @ W_h + b
-├── 51. Tensor splitting along feature axis: np.split(Z, 4, axis=-1)
-├── 52. Efficient cache utilization and SIMD vectorization
-│
-▼
-BACKPROPAGATION THROUGH TIME (BPTT) THEORY
-│
-├── 53. Multivariate chain rule for dual memory states
-├── 54. Error entering from output layer (delta_o_out)
-├── 55. Total hidden state error: delta_h_t = delta_h_ext + delta_h_{next}
-├── 56. Error backpropagating into cell state: delta_C_t
-├── 57. The dual path into delta_C_t (current h_t + future C_{t+1})
-├── 58. delta_C_t = delta_h_t * o_t * (1 - tanh^2(C_t)) + delta_C_{t+1} * f_{t+1}
-├── 59. The unbroken gradient flow of delta_C_{t+1} * f_{t+1}
-│
-▼
-GATE GRADIENT CALCULUS
-│
-├── 60. Output gate pre-activation gradient: delta_z_o
-├── 61. delta_z_o = delta_h_t * tanh(C_t) * o_t * (1 - o_t)
-├── 62. Candidate state pre-activation gradient: delta_z_c
-├── 63. delta_z_c = delta_C_t * i_t * (1 - C~_t^2)
-├── 64. Input gate pre-activation gradient: delta_z_i
-├── 65. delta_z_i = delta_C_t * C~_t * i_t * (1 - i_t)
-├── 66. Forget gate pre-activation gradient: delta_z_f
-├── 67. delta_z_f = delta_C_t * C_{t-1} * f_t * (1 - f_t)
-│
-▼
-ACCUMULATING FUSED WEIGHT GRADIENTS
-│
-├── 68. Fused pre-activation gradient: delta_Z in R^(B x 4H)
-├── 69. Concatenating gate gradients: np.concatenate([d_zf, d_zi, d_zc, d_zo])
-├── 70. Fused input weight gradient: dW_x = sum(x_t.T @ delta_Z_t)
-├── 71. Fused recurrent weight gradient: dW_h = sum(h_{t-1}.T @ delta_Z_t)
-├── 72. Fused bias gradient: db = sum(delta_Z_t)
-├── 73. Propagating error to prior hidden state: delta_h_{t-1} = delta_Z @ W_h.T
-├── 74. Propagating error to prior cell state: delta_C_{t-1} = delta_C_t * f_t
-│
-▼
-TRAINING DYNAMICS & OPTIMIZATION
-│
-├── 75. Parameter initialization strategies (Xavier / He)
-├── 76. Forget gate bias initialization rule (b_f = 1.0)
-├── 77. Exploding gradients in LSTM output projections
-├── 78. Global gradient norm clipping
-├── 79. Learning rate scheduling for sequential models
-├── 80. Adam vs SGD for gated recurrent networks
-│
-▼
-LSTM VARIANTS & ARCHITECTURES
-│
-├── 81. Peephole connections (Gers & Schmidhuber, 2000)
-├── 82. Coupled input and forget gates (CIFG)
-├── 83. Bidirectional LSTM (BiLSTM)
-├── 84. Deep / Stacked Multi-Layer LSTMs
-├── 85. Dropout in recurrent layers (Gal & Ghahramani)
-├── 86. Gated Recurrent Unit (GRU) preview (Project 10)
-│
-▼
-BENCHMARKING & VALIDATION
-│
-├── 87. The Long-Range Bit Memory synthetic task
-├── 88. Sequence length stress testing (T=10 vs T=50 vs T=100)
-├── 89. Plotting gradient norm decay: Simple RNN vs LSTM
-├── 90. Inspecting learned gate activations over time
-├── 91. Numerical gradient checking with finite differences
-├── 92. Debugging tensor shape mismatches
-│
-▼
-PYTORCH BENCHMARKING & COMPARISON
-│
-├── 93. Building an equivalent model with torch.nn.LSTM
-├── 94. Understanding PyTorch weight layout: weight_ih_l0 and weight_hh_l0
-├── 95. PyTorch gate order: (i, f, g, o) vs our fused order
-├── 96. Weight copying and numerical output matching
-├── 97. Loss curve parity verification
-├── 98. Forward and backward runtime benchmarks
-│
-▼
-MASTERY MILESTONE
-│
-├── 99. Why LSTMs enabled speech recognition, translation, and modern NLP
-├── 100. Limitations of LSTMs (sequential computation bottleneck, lack of parallelism)
-└── 101. Complete production-grade LSTM implementation from scratch
-```
 
 ---
 
@@ -616,5 +440,5 @@ MASTERY MILESTONE
 
 ## Next Steps
 
-1. Build [`steps/step-01-mathematics.md`](file:///Users/pasan/Documents/Personal/deep-learning-foundations/09-lstm/steps/step-01-mathematics.md) detailing first-principles matrix calculus, the Jacobian derivation of the Constant Error Carousel, and step-by-step BPTT walkthrough.
-2. Implement the vectorized pure NumPy LSTM in [`src/lstm.py`](file:///Users/pasan/Documents/Personal/deep-learning-foundations/09-lstm/src/lstm.py) and prove that it solves the long-range dependency task where vanilla RNNs fail.
+1. Implement the equivalent model using PyTorch (`torch.nn.LSTM`) to verify parameter layout (`weight_ih_l0`, `weight_hh_l0`) and gate permutation ordering (`(i, f, g, o)` vs. fused `(f, i, c, o)`).
+2. Directly validate loss curves, state trajectories, and runtime performance benchmarks between the pure NumPy and PyTorch implementations.
