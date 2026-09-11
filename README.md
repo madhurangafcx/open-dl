@@ -37,7 +37,7 @@ A first-principles journey through modern deep learning. Every foundational arch
 | **09** | [LSTM Scratch](09-lstm/README.md) | Constant Error Carousel ($C_t$), $f/i/o/\tilde{C}$ gates, vanishing gradient immunity | [Math](09-lstm/steps/step-01-mathematics.md) · [Code](09-lstm/src/lstm.py) |
 | **10** | [GRU Scratch](10-gru/README.md) | Reset & update gates ($r, z$), linear memory highway, 25% fewer params | [Math](10-gru/steps/step-01-mathematics.md) · [Code](10-gru/src/gru.py) |
 | **11** | [Sequence Model](11-sequence-prediction/README.md) | Autoregressive causal shift $+1$, sparse BPTT, PPL, greedy/top-k/top-p sampling | [Math](11-sequence-prediction/steps/step-01-mathematics.md) · [Code](11-sequence-prediction/src/sequence_model.py) |
-| **12** | [Attention](12-attention/README.md) | Bahdanau & Luong attention, associative Query-Key-Value ($Q, K, V$) | [README](12-attention/README.md) |
+| **12** | [Attention](12-attention/README.md) | Scaled dot-product, multi-head projections, Softmax Jacobian, causal masking | [Math](12-attention/steps/step-01-mathematics.md) · [Code](12-attention/src/attention.py) |
 | **13** | [Mini-Transformer](13-mini-transformer/README.md) | Scaled Dot-Product, Multi-Head Attention, Positional Encoding, Pre-LN | [README](13-mini-transformer/README.md) |
 | **14** | [Mini-LLM (GPT)](14-mini-llm/README.md) | Decoder-only autoregressive GPT, causal masking, KV cache | [README](14-mini-llm/README.md) |
 
@@ -58,9 +58,15 @@ python3 08-sentiment-rnn/src/sentiment_rnn.py
 python3 09-lstm/src/lstm.py
 python3 10-gru/src/gru.py
 python3 11-sequence-prediction/src/sequence_model.py
+python3 12-attention/src/attention.py
 ```
 
 ---
+
+### Note
+```text
+Please note that some parts of the README might not display correctly due to limited Markdown support or formatting errors in the math syntax.
+```
 
 ### Author
 Created by **Pasan Madhuranga** ([@madhurangafcx](https://github.com/madhurangafcx)) as an open educational foundation for deep learning engineers and researchers.
