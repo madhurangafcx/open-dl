@@ -1,0 +1,12 @@
+# 14-mini-llm. The vendored tokenizer in src/bpe/ needs regex (not stdlib `re`)
+# for its \p{...} Unicode category patterns; everything else it uses is stdlib.
+numpy
+regex
+torch==2.14.0
+
+# src/api.py only. VENDORED.md records that leaving the tokenizer's own FastAPI
+# layer behind dropped these; they are back for this project's service, not for
+# the tokenizer, which still needs nothing beyond regex. Nothing under src/bpe/
+# imports them, and steps 1-10 run without them installed.
+fastapi
+uvicorn

@@ -10,3 +10,6 @@ __pycache__/
 .venv/
 env/
 venv/
+tokenizer-from-scrach/
+artifacts/
+.vscode
